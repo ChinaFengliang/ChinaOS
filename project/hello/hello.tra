@@ -1,0 +1,47 @@
+*** Creating Trace Output File 'hello.tra' Ok.
+### Preparing for ADS-LD.
+### Creating ADS-LD Command Line
+### List of Objects: adding '".\boot.o"'
+### List of Objects: adding '"cpu.o"'
+### List of Objects: adding '"system_init.o"'
+### List of Objects: adding '".\syscall.o"'
+### List of Objects: adding '"interrupt.o"'
+### List of Objects: adding '"device.o"'
+### List of Objects: adding '"timer.o"'
+### List of Objects: adding '"millisecond.o"'
+### List of Objects: adding '"ticker.o"'
+### List of Objects: adding '"can.o"'
+### List of Objects: adding '"can_filter.o"'
+### List of Objects: adding '"can0.o"'
+### List of Objects: adding '"can1.o"'
+### List of Objects: adding '"uart.o"'
+### List of Objects: adding '"uart0.o"'
+### List of Objects: adding '"led2.o"'
+### List of Objects: adding '"kernel.o"'
+### List of Objects: adding '"semaphore.o"'
+### List of Objects: adding '"mailbox.o"'
+### List of Objects: adding '"pipe.o"'
+### List of Objects: adding '"sysio.o"'
+### List of Objects: adding '"bit.o"'
+### List of Objects: adding '"malloc.o"'
+### List of Objects: adding '"printk.o"'
+### List of Objects: adding '"console.o"'
+### List of Objects: adding '"commmand.o"'
+### List of Objects: adding '"main.o"'
+### List of Objects: adding '"thread_1.o"'
+### List of Objects: adding '"thread_2.o"'
+### ADS-LD Command completed:
+--cpu Cortex-M3 ".\boot.o" "cpu.o" "system_init.o" ".\syscall.o" "interrupt.o" "device.o" "timer.o" "millisecond.o" "ticker.o" "can.o" "can_filter.o" "can0.o" "can1.o" "uart.o" "uart0.o" "led2.o" "kernel.o" "semaphore.o" "mailbox.o" "pipe.o" "sysio.o" "bit.o" "malloc.o" "printk.o" "console.o" "commmand.o" "main.o" "thread_1.o" "thread_2.o" --strict --scatter "..\..\ChinaOS\architecture\arm\cortex-m3\nxp\lpc1766\can_repeater\load\release.scf" 
+--entry=main --keep=boot.o(Heap) --keep=boot.o(Stack) --autoat --summary_stderr --info summarysizes --map --xref --callgraph --symbols 
+--info sizes --info totals --info unused --info veneers 
+ --list ".\hello.map" -o "hello.axf"### Preparing Environment (PrepEnvAds)
+### ADS-LD Output File: 'hello.axf'
+### ADS-LD Command File: 'hello.lnp'
+### Checking for dirty Components...
+### Creating CmdFile 'hello.lnp', Handle=0x00000734
+### Writing '.lnp' file
+### ADS-LD Command file 'hello.lnp' is ready.
+### ADS-LD: About to start ADS-LD Thread.
+### ADS-LD: executed with 2 errors
+### Updating obj list
+### LDADS_file() completed.
