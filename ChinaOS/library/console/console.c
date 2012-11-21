@@ -57,7 +57,7 @@ typedef struct __service             SHELL_SERVICE;                         /* s
 *********************************************************************************************************************/
 extern int                  aConsoleServices$$Base;                         /* 合并节的开始地址                     */
 extern int                  aConsoleServices$$Limit;                        /* 合并节的末尾的后面的字节的地址       */
-const char                  aCmdPrompt[] = "[ChinaOS]# ";                   /* 命令提示符                           */
+extern const char           aCmdPrompt[];                   				/* 命令提示符                           */
 static char                 aCmdBuffer[CMD_LINE_SIZE];                      /* 命令缓存区                           */
 /* 状态信息 --------------------------------------------------------------------------------------------------------*/
 static const char          *aStatus[] =                                     /* 命令状态描述                         */
