@@ -1,0 +1,612 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000         ;/******************************************************
+                       Copyright (c)*******************************************
+                       *******
+    2 00000000         ;**                                              µ¨ÇÓÊÇ×
+                       èÖ¹Ò»ÇÐ¿ÉÄÜµÄ¸ù±¾ÔµÓÉ
+    3 00000000         ;**
+    4 00000000         ;**                                             E-Mail: 
+                       ChinaFengliang@163.com
+    5 00000000         ;**
+    6 00000000         ;**---------File Information----------------------------
+                       --------------------------------------------------------
+                       -------
+    7 00000000         ;** File name:            system.s
+    8 00000000         ;** Last version:         V1.00
+    9 00000000         ;** Descriptions:         ÏµÍ³µ÷ÓÃÎÄ¼þ.
+   10 00000000         ;** Hardware platform:    Cortex-M3ÏµÁÐ
+   11 00000000         ;** SoftWare platform:    ChinaOS
+   12 00000000         ;**
+   13 00000000         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+   14 00000000         ;** Created by:           FengLiang
+   15 00000000         ;** Created date:         2010Äê8ÔÂ26ÈÕ  17:12:13
+   16 00000000         ;** Version:              V1.00
+   17 00000000         ;** Descriptions:         The original version
+   18 00000000         ;**
+   19 00000000         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+   20 00000000         ;** Modified by:
+   21 00000000         ;** Modified date:
+   22 00000000         ;** Version:
+   23 00000000         ;** Descriptions:
+   24 00000000         ;**
+   25 00000000         ;*******************************************************
+                       ********************************************************
+                       ******/
+   26 00000000                 AREA             system_call, CODE, READONLY
+   27 00000000         
+   28 00000000         ;/******************************************************
+                       ********************************************************
+                       *******
+   29 00000000         ;                                                   ½Ó¿Ú
+                       ÉêÃ÷Çø
+   30 00000000         ;*******************************************************
+                       ********************************************************
+                       ******/
+   31 00000000         ;/* µ¼³ö½Ó¿Ú -------------------------------------------
+                       --------------------------------------------------------
+                       -----*/
+   32 00000000                 EXPORT           syscall_exception ;/* ÏµÍ³µ÷ÓÃÖ
+                                                            Ð¶Ï·þÎñ            
+                                                                     */
+   33 00000000                 EXPORT           pendsv_exception ;/* pendsvÖÐ¶Ï
+                                                            ·þÎñ               
+                                                                    */    
+   34 00000000         
+   35 00000000         ;/* µ¼Èë½Ó¿Ú -------------------------------------------
+                       --------------------------------------------------------
+
+
+
+ARM Macro Assembler    Page 2 
+
+
+                       -----*/
+   36 00000000                 IMPORT           OS_This     ;pThreadThis       
+                                                                               
+                                                                               
+                                                                ;/* µ±Ç°ÔËÐÐµÄÏ
+                                                            ß³Ì                
+                                                                   */
+   37 00000000                 IMPORT           shift_thread ;/* Ïß³Ì½»Ìæ      
+                                                                               
+                                                                */
+   38 00000000         
+   39 00000000         ;/******************************************************
+                       ********************************************************
+                       *******
+   40 00000000         ;                                                   ºê¶¨
+                       ÒåÇø
+   41 00000000         ;*******************************************************
+                       ********************************************************
+                       ******/
+   42 00000000         ;/* ¼Ä´æÆ÷µØÖ· -----------------------------------------
+                       --------------------------------------------------------
+                       -----*/
+   43 00000000 E000ED04 
+                       ICSR    EQU              0xE000ED04  ;/* ÖÐ¶Ï¿ØÖÆ¼°×´Ì¬¼
+                                                            Ä´æÆ÷ICSR          
+                                                               */
+   44 00000000         
+   45 00000000         ;/******************************************************
+                       ********************************************************
+                       *******
+   46 00000000         ;** Function name:           static_service_entry
+   47 00000000         ;** Descriptions:            ÏµÍ³µ÷ÓÃ·þÎñÈë¿Ú
+   48 00000000         ;** Input parameters:        ËùÓÐ²ÎÊý·ÅÔÚÕ»¶¥Î»ÖÃ
+   49 00000000         ;** Output parameters:       
+   50 00000000         ;** Returned value:          
+   51 00000000         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+   52 00000000         ;** Created by:              Fengliang
+   53 00000000         ;** Created Date:            2010-8-26  17:22:54
+   54 00000000         ;** Test recorde:
+   55 00000000         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+   56 00000000         ;** Modified by:
+   57 00000000         ;** Modified date:
+   58 00000000         ;** Test recorde:
+   59 00000000         ;*******************************************************
+                       ********************************************************
+                       ******/
+   60 00000000         syscall_exception
+   61 00000000         ;/* »ñÈ¡Õ»¶¥µØÖ·ÖÁR0 */
+   62 00000000 F01E 0F04       TST              LR,     #4
+   63 00000004 BF0C            ITE              EQ
+   64 00000006 F3EF 8308       MRSEQ            R3,     MSP
+   65 0000000A F3EF 8309       MRSNE            R3,     PSP
+   66 0000000E         
+   67 0000000E         ;/* ´ËÊ±R3±£´æÕ»¶¥Ö¸Õë */
+   68 0000000E         
+
+
+
+ARM Macro Assembler    Page 3 
+
+
+   69 0000000E         ;/* ÓÉÓÚÓ²¼þ×Ô¶¯½«R0~R3Ñ¹ÈëÕ»,ËùÒÔ²ÎÊýÓ¦¸Ã´ÓÕ»ÀïÈ¡³ö */
+   70 0000000E 6818            LDR              R0,  [R3]   ;/* ¶ÁÈ¡µØÖ·R0±äÁ¿µ
+                                                            ÄÖµ       */  
+   71 00000010 6859            LDR              R1,     [R3, #4] ;/* ¶ÁÈ¡µØÖ·R1
+                                                            ±äÁ¿µÄÖµ       */
+   72 00000012         
+   73 00000012         
+   74 00000012 F1B0 0F08       CMP.W            R0,     #8  ;/* ÏÞ¶¨×î´ó·þÎñÊýÄ
+                                                            ¿: [0,8]           
+                                                              */
+   75 00000016 BF88 4770       BXHI             LR
+   76 0000001A E8DF F010       TBH.W            [PC,    R0, LSL #1]
+   77 0000001E         
+   78 0000001E         static_service_table                 ;/*------------- ·þ
+                                                            ÎñÁÐ±í ------------
+                                                            --*/
+   79 0000001E 0005            DCI              ((static_thread_switch - static
+_service_table)/2) 
+                                                            ;/* 0ºÅ·þÎñ: Ïß³ÌÇÐ
+                                                            »»                 
+                                                              */
+   80 00000020 0010            DCI              ((static_activate_system - stat
+ic_service_table)/2) 
+                                                            ;/* 1ºÅ·þÎñ: ¼¤»î²Ù
+                                                            ×÷ÏµÍ³             
+                                                              */
+   81 00000022 0027            DCI              ((static_system_restart - stati
+c_service_table)/2) 
+                                                            ;/* 2ºÅ·þÎñ: ÏµÍ³ÖØ
+                                                            Æô                 
+                                                              */
+   82 00000024 0020            DCI              ((static_atom_operate_lock - st
+atic_service_table)/2) 
+                                                            ;/* 3ºÅ·þÎñ: Ô­×Ó²Ù
+                                                            ×÷¿ªÊ¼             
+                                                              */
+   83 00000026 0024            DCI              ((static_atom_operate_unlock - 
+static_service_table)/2) 
+                                                            ;/* 4ºÅ·þÎñ: Ô­×Ó²Ù
+                                                            ×÷½áÊø             
+                                                              */
+   84 00000028         
+   85 00000028         ;/******************************************************
+                       ********************************************************
+                       *******
+   86 00000028         ;** Function name:           void static_thread_switch(v
+                       oid)
+   87 00000028         ;** Descriptions:            Ïß³ÌÇÐ»»(º¯ÊýÖ÷¶¯ÒªÇóÏß³ÌÇÐ
+                       »»Èë¿Ú)
+   88 00000028         ;** Input parameters:        None
+   89 00000028         ;** Output parameters:       None
+   90 00000028         ;** Returned value:          None
+   91 00000028         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+   92 00000028         ;** Created by:              Fengliang
+   93 00000028         ;** Created Date:            2010-9-2  9:19:42
+   94 00000028         ;** Test recorde:
+   95 00000028         ;**-----------------------------------------------------
+
+
+
+ARM Macro Assembler    Page 4 
+
+
+                       --------------------------------------------------------
+                       -------
+   96 00000028         ;** Modified by:
+   97 00000028         ;** Modified date:
+   98 00000028         ;** Test recorde:
+   99 00000028         ;*******************************************************
+                       ********************************************************
+                       ******/
+  100 00000028         static_thread_switch
+  101 00000028         ;/* ÐüÆðpendsvÖÐ¶Ï,ÒÔ½øÈëpendsvÇÐ»»Ïß³ÌÇé¾° */
+  102 00000028 4810            LDR              r0, =ICSR
+  103 0000002A F04F 5180       LDR              r1, =0x10000000 ;/* PENDSVSETÎ»
+                                                                               
+                                                                  */
+  104 0000002E 6001            STR              r1, [r0]    ;/* ÖÃÎ»ICSR¼Ä´æÆ÷µ
+                                                            ÄPENDSVSETÎ»       
+                                                              */
+  105 00000030 4770            BX               lr          ;/* ·µ»Ø           
+                                                                               
+                                                              */
+  106 00000032         ;/******************************************************
+                       ********************************************************
+                       *******
+  107 00000032         ;** Function name:           static_thread_switch
+  108 00000032         ;** Descriptions:            Ïß³ÌÇÐ»»(º¯ÊýÖ÷¶¯ÒªÇóÏß³ÌÇÐ
+                       »»Èë¿Ú)
+  109 00000032         ;** Input parameters:        None
+  110 00000032         ;** Output parameters:       None
+  111 00000032         ;** Returned value:          None
+  112 00000032         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  113 00000032         ;** Created by:              Fengliang
+  114 00000032         ;** Created Date:            2010-9-2  9:19:42
+  115 00000032         ;** Test recorde:
+  116 00000032         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  117 00000032         ;** Modified by:
+  118 00000032         ;** Modified date:
+  119 00000032         ;** Test recorde:
+  120 00000032         ;*******************************************************
+                       ********************************************************
+                       ******/
+  121 00000032         pendsv_exception
+  122 00000032         ;/* ±£´æthisÏß³ÌµÄÔËÐÐ»·¾³ */
+  123 00000032 F3EF 8109       MRS              r1, psp     ;/* get from thread
+                                                             stack pointer     
+                                                               */
+  124 00000036 E921 0FF0       STMFD            r1!, {r4 - r11} ;/* push r4 - r
+                                                            11 register        
+                                                                   */
+  125 0000003A 4608            MOV              r0, r1      ;/* ÐÞÕý: SP       
+                                                                         */
+  126 0000003C         
+  127 0000003C E006            B                update_thread
+  128 0000003E         
+  129 0000003E         ;/******************************************************
+                       ********************************************************
+
+
+
+ARM Macro Assembler    Page 5 
+
+
+                       *******
+  130 0000003E         ;** Function name:          void static_activate_system(
+                       void)
+  131 0000003E         ;** Descriptions:           ¼¤»î²Ù×÷ÏµÍ³
+  132 0000003E         ;** Input parameters:       
+  133 0000003E         ;** Output parameters:      
+  134 0000003E         ;** Returned value:         R0 : ¼´½«µÇ³¡Ïß³ÌµÄÕ»¶¥Ö¸Õë
+  135 0000003E         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  136 0000003E         ;** Created by:
+  137 0000003E         ;** Created Date:            2010-9-2  14:19:45
+  138 0000003E         ;** Test recorde:
+  139 0000003E         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  140 0000003E         ;** Modified by:
+  141 0000003E         ;** Modified date:
+  142 0000003E         ;** Test recorde:
+  143 0000003E         ;*******************************************************
+                       ********************************************************
+                       ******/
+  144 0000003E         static_activate_system
+  145 0000003E         ;/* 
+  146 0000003E         ; * Õ»¼Ä´æÆ÷: MSPÏß³ÌÕ»
+  147 0000003E         ; * È¨ÏÞÄ£Ê½: ÌØÈ¨È¨ÏÞ
+  148 0000003E         ; */
+  149 0000003E F04F 0000       MOV              R0, #0x0
+  150 00000042 F380 8814       MSR              CONTROL, R0
+  151 00000046         
+  152 00000046 480A            LDR              R0, =OS_This ;pThreadThis
+  153 00000048 6800            LDR              R0, [R0]
+  154 0000004A 6800            LDR              R0, [R0]
+  155 0000004C         
+  156 0000004C         update_thread
+  157 0000004C F7FF FFFE       BL               shift_thread
+  158 00000050         ;/******************************************************
+                       ********************************************************
+                       *******
+  159 00000050         ;** Function name:           void regist_recover(int R0)
+                       
+  160 00000050         ;** Descriptions:            ½«ÐÂÏß³Ì»·¾³´Ó¶ÑÕ»ÖÐ»Ö¸´µ½µ
+                       ÄÏÖ³¡
+  161 00000050         ;** Input parameters:        R0 : ¼´½«µÇ³¡Ïß³ÌµÄÕ»¶¥Ö¸Õë
+                       
+  162 00000050         ;** Output parameters:
+  163 00000050         ;** Returned value:          
+  164 00000050         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  165 00000050         ;** Created by:
+  166 00000050         ;** Created Date:            
+  167 00000050         ;** Test recorde:
+  168 00000050         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  169 00000050         ;** Modified by:
+  170 00000050         ;** Modified date:
+  171 00000050         ;** Test recorde:
+
+
+
+ARM Macro Assembler    Page 6 
+
+
+  172 00000050         ;*******************************************************
+                       ********************************************************
+                       ******/
+  173 00000050         regist_recover
+  174 00000050         ;/* Òì³£·µ»ØÏß³ÌÄ£Ê½,²¢Ê¹ÓÃÏß³Ì¶ÑÕ»PSP¼Ä´æÆ÷ */
+  175 00000050 F06F 0E02       MOV              LR,  #0xFFFFFFFD
+  176 00000054         ;LDR     r0, [r0]                                       
+                                   ;/* load thread stack pointer            */
+  177 00000054 E8B0 0FF0       LDMFD            r0!, {r4 - r11} ;/* pop r4 - r1
+                                                            1 register         
+                                                                   */
+  178 00000058 F380 8809       MSR              psp, r0     ;/* ¸üÐÂÏß³Ì¶ÑÕ»   
+                                                                               
+                                                               */
+  179 0000005C 4770            BX               LR
+  180 0000005E         
+  181 0000005E         ;/******************************************************
+                       ********************************************************
+                       *******
+  182 0000005E         ;** Function name:           int static_atom_operate_loc
+                       k(void)
+  183 0000005E         ;** Descriptions:            Ô­×Ó²Ù×÷¿ªÊ¼
+  184 0000005E         ;** Input parameters:        
+  185 0000005E         ;** Output parameters:       
+  186 0000005E         ;** Returned value:          ÖÐ¶Ï×´Ì¬¿ØÖÆ×Ö
+  187 0000005E         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  188 0000005E         ;** Created by:              Fengliang
+  189 0000005E         ;** Created Date:            2010-8-26  17:32:9
+  190 0000005E         ;** Test recorde:
+  191 0000005E         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  192 0000005E         ;** Modified by:
+  193 0000005E         ;** Modified date:
+  194 0000005E         ;** Test recorde:
+  195 0000005E         ;*******************************************************
+                       ********************************************************
+                       ******/
+  196 0000005E         static_atom_operate_lock
+                               PROC
+  197 0000005E                 EXPORT           static_atom_operate_lock
+  198 0000005E F3EF 8010       MRS              r0,   PRIMASK ;/* ¿½±´ÖÐ¶Ï¿ØÖÆ×
+                                                            ´Ì¬                
+                                                                 */
+  199 00000062 B672            CPSID            I           ;/* PRIMASK=1; ¹ØÖÐ
+                                                            ¶Ï      */
+  200 00000064 4770            BX               LR
+  201 00000066                 ENDP
+  202 00000066         
+  203 00000066         ;/******************************************************
+                       ********************************************************
+                       *******
+  204 00000066         ;** Function name:           void static_atom_operate_un
+                       lock(int R0)
+  205 00000066         ;** Descriptions:            Ô­×Ó²Ù×÷½áÊø
+  206 00000066         ;** Input parameters:        R0: ÖÐ¶Ï×´Ì¬¿ØÖÆ×Ö
+  207 00000066         ;** Output parameters:       
+
+
+
+ARM Macro Assembler    Page 7 
+
+
+  208 00000066         ;** Returned value:          
+  209 00000066         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  210 00000066         ;** Created by:              Fengliang
+  211 00000066         ;** Created Date:            2010-8-26  17:33:13
+  212 00000066         ;** Test recorde:
+  213 00000066         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  214 00000066         ;** Modified by:
+  215 00000066         ;** Modified date:
+  216 00000066         ;** Test recorde:
+  217 00000066         ;*******************************************************
+                       ********************************************************
+                       ******/
+  218 00000066         static_atom_operate_unlock
+                               PROC
+  219 00000066                 EXPORT           static_atom_operate_unlock
+  220 00000066 F380 8810       MSR              PRIMASK,  R0 ;/* »Ö¸´ÖÐ¶Ï¿ØÖÆ×´
+                                                            Ì¬                 
+                                                                */             
+                                                            
+  221 0000006A 4770            BX               LR
+  222 0000006C                 ENDP
+  223 0000006C         
+  224 0000006C         ;/******************************************************
+                       ********************************************************
+                       *******
+  225 0000006C         ;** Function name:           static_system_restart
+  226 0000006C         ;** Descriptions:            ÏµÍ³ÖØÆô
+  227 0000006C         ;** Input parameters:        
+  228 0000006C         ;** Output parameters:       
+  229 0000006C         ;** Returned value:          
+  230 0000006C         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  231 0000006C         ;** Created by:              Fengliang
+  232 0000006C         ;** Created Date:            2010-8-26  17:33:13
+  233 0000006C         ;** Test recorde:
+  234 0000006C         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+  235 0000006C         ;** Modified by:
+  236 0000006C         ;** Modified date:
+  237 0000006C         ;** Test recorde:
+  238 0000006C         ;*******************************************************
+                       ********************************************************
+                       ******/
+  239 0000006C         static_system_restart
+                               PROC
+  240 0000006C         
+  241 0000006C                 ENDP
+  242 0000006C                 ALIGN
+  243 0000006C         
+  244 0000006C                 END                          ;/* ´úÂëÄ©¶Ë       
+                                                                               
+                                                               */
+              E000ED04 
+
+
+
+ARM Macro Assembler    Page 8 
+
+
+              00000000 
+Command Line: --debug --xref --cpu=Cortex-M3 --apcs=interwork --depend=.\output
+\debug\syscall.d -o.\output\debug\syscall.o -IC:\Keil\ARM\INC -IC:\Keil\ARM\INC
+\NXP\LPC17xx --list=.\syscall.lst ..\..\ChinaOS\architecture\arm\cortex-m3\sysc
+all.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+pendsv_exception 00000032
+
+Symbol: pendsv_exception
+   Definitions
+      At line 121 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 33 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: pendsv_exception used once
+regist_recover 00000050
+
+Symbol: regist_recover
+   Definitions
+      At line 173 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      None
+Comment: regist_recover unused
+static_activate_system 0000003E
+
+Symbol: static_activate_system
+   Definitions
+      At line 144 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 80 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: static_activate_system used once
+static_atom_operate_lock 0000005E
+
+Symbol: static_atom_operate_lock
+   Definitions
+      At line 196 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 82 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+      At line 197 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+
+static_atom_operate_unlock 00000066
+
+Symbol: static_atom_operate_unlock
+   Definitions
+      At line 218 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 83 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+      At line 219 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+
+static_service_table 0000001E
+
+Symbol: static_service_table
+   Definitions
+      At line 78 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 79 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+      At line 80 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+      At line 81 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+      At line 82 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+      At line 83 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+
+static_system_restart 0000006C
+
+Symbol: static_system_restart
+   Definitions
+      At line 239 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+
+
+
+ARM Macro Assembler    Page 2 Alphabetic symbol ordering
+Relocatable symbols
+
+   Uses
+      At line 81 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: static_system_restart used once
+static_thread_switch 00000028
+
+Symbol: static_thread_switch
+   Definitions
+      At line 100 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 79 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: static_thread_switch used once
+syscall_exception 00000000
+
+Symbol: syscall_exception
+   Definitions
+      At line 60 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 32 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: syscall_exception used once
+system_call 00000000
+
+Symbol: system_call
+   Definitions
+      At line 26 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      None
+Comment: system_call unused
+update_thread 0000004C
+
+Symbol: update_thread
+   Definitions
+      At line 156 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 127 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: update_thread used once
+11 symbols
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Absolute symbols
+
+ICSR E000ED04
+
+Symbol: ICSR
+   Definitions
+      At line 43 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 102 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: ICSR used once
+1 symbol
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+External symbols
+
+OS_This 00000000
+
+Symbol: OS_This
+   Definitions
+      At line 36 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 152 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: OS_This used once
+shift_thread 00000000
+
+Symbol: shift_thread
+   Definitions
+      At line 37 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+   Uses
+      At line 157 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
+Comment: shift_thread used once
+2 symbols
+340 symbols in table

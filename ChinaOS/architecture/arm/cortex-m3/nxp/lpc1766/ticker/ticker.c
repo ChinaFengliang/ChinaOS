@@ -57,10 +57,6 @@
                                                   全局变量定义区
 *********************************************************************************************************************/
 static TIMER        *OS_pTimer;                                             /* 当前定时器                           */
-extern INT32U        OS_ActivePrio;                                         /* 激活的优先级标志                     */
-extern THREAD       *OS_ActiveProc[33];                                     /* 激活的线程队列                       */
-extern THREAD       *OS_This;                                               /* 当前线程                             */
-
 
 /*********************************************************************************************************************
 ** Function name:           get_left_time
@@ -291,20 +287,8 @@ void systimer_exception(void)
         pThread = (THREAD *)(((INT32U)pTimer) - (INT32U)&((THREAD*)0)->Timer);
         Priority = pThread->Priority;
 
-        if (NULL == OS_ActiveProc[Priority])
-        {   /* 由0个节点增加到1个节点 */
-            pThread->pNext = pThread;
-            pThread->pPrev = pThread;
-            OS_ActiveProc[Priority] = pThread;
-            OS_ActivePrio |= 1ul << Priority;                               /* 设置优先级就绪标志                   */
-        }
-        else
-        {   /* 加在队列的后面 */
-            pThread->pPrev = OS_ActiveProc[Priority]->pPrev;
-            pThread->pNext = OS_ActiveProc[Priority];
-            OS_ActiveProc[Priority]->pPrev->pNext = pThread;
-            OS_ActiveProc[Priority]->pPrev = pThread;
-        }
+        list_add(&pThread->Node, &OS_ActiveProc[Priority]);
+        OS_ActivePrio |= 1ul << Priority;
 
         /*
          * 4) 切换到下一个定时器.

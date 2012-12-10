@@ -55,11 +55,20 @@ typedef struct __uart_info                          UART_INFO;              /* ¥
 /* uart≈‰÷√¿‡–Õ ----------------------------------------------------------------------------------------------------*/
 struct uart_config
 {
-	int             BaudRate;
-	char 			DataBit;
-	char 			StopBit;
-	char			ParityBit;
-	char			StreamControl;
+	int             BaudRate;												/* ≤®Ãÿ¬ 								*/
+	
+	/*
+	 * {5,6,7,8}
+	 */
+	char 			DataBit;												/*  ˝æ›Œª								*/
+
+	/*
+	 * {1, 1.5, 2}
+	 */
+	char 			StopBit;												/* Õ£÷πŒª								*/
+	
+	char			ParityBit;												/* –£—ÈŒª								*/
+	char			StreamControl;											/* ¡˜øÿ÷∆								*/
 };
 
 /* …Ë±∏π¶ƒ‹¿‡–Õ ----------------------------------------------------------------------------------------------------*/

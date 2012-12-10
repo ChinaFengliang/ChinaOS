@@ -51,10 +51,7 @@
 /*********************************************************************************************************************
                                                   全局变量定义区
 *********************************************************************************************************************/
-extern INT32U        OS_InterruptNesting;                                   /* 中断嵌套计数器                       */
-extern INT32U        OS_ActivePrio;                                         /* 激活的优先级标志                     */
-extern THREAD       *OS_ActiveProc[33];                                     /* 激活的线程队列                       */
-extern THREAD       *OS_This;                                               /* 当前运行的线程                       */
+
 
 /*********************************************************************************************************************
 ** Function name:           semaphore_new
@@ -77,10 +74,10 @@ SEMAPHORE semaphore_new(INT32U Amount)
     SEMAPHORE   Semaphore = NULL;
 
     
-    if (NULL != (Semaphore = (SEMAPHORE)malloc(sizeof(struct __semaphore))))
+    if (NULL != (Semaphore = (SEMAPHORE)malloc(sizeof(struct semaphore))))
     {
         Semaphore->Counter = Amount;
-        Semaphore->pThread = NULL;
+        INIT_LIST_HEAD(&Semaphore->WaitHead);
     }
     
     return Semaphore;
@@ -133,7 +130,7 @@ int semaphore_create(SEMAPHORE Semaphore, INT32U Amount)
     }
 
     Semaphore->Counter = Amount;
-    Semaphore->pThread = NULL;
+    INIT_LIST_HEAD(&Semaphore->WaitHead);
     
     return OK;
 }
@@ -227,16 +224,10 @@ int semaphore_wait(SEMAPHORE Semaphore, INT32U Timeout)
      */
     pThread = OS_This;
     Priority = pThread->Priority;
-    if (pThread == pThread->pNext)
-    {   /* 唯一节点 */
-        OS_ActiveProc[Priority] = NULL;
-        OS_ActivePrio &= ~(1ul << Priority);                                /* 清除就绪标志                         */
-    }
-    else
-    {   /* 非唯一节点 */
-        pThread->pPrev->pNext   = pThread->pNext;
-        pThread->pNext->pPrev   = pThread->pPrev;
-        OS_ActiveProc[Priority] = pThread->pNext;                           /* 更新线程组指针                       */
+    list_del(&pThread->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
+    {   
+        OS_ActivePrio &= ~(1ul << Priority);
     }
 
     /* 2)
@@ -248,19 +239,7 @@ int semaphore_wait(SEMAPHORE Semaphore, INT32U Timeout)
     /* 2.1)
      * 加入信号量等待队列
      */
-    if (NULL == Semaphore->pThread)
-    {   /* 由0个节点增加到1个节点 */
-        pThread->pNext     = pThread;
-        pThread->pPrev     = pThread;
-        Semaphore->pThread = pThread;
-    }
-    else
-    {   /* 加在队列的后面 */
-        pThread->pPrev = Semaphore->pThread->pPrev;
-        pThread->pNext = Semaphore->pThread;
-        Semaphore->pThread->pPrev->pNext = pThread;
-        Semaphore->pThread->pPrev = pThread;        
-    }
+    list_add(&pThread->Node, &Semaphore->WaitHead);
 
     /* 2.2) 
      * 添加唤醒定时器.
@@ -292,17 +271,8 @@ int semaphore_wait(SEMAPHORE Semaphore, INT32U Timeout)
     }
     /*
      * 4.2) 退出信号量等待队列.
-     */
-    if (pThread == pThread->pNext)
-    {
-        Semaphore->pThread = NULL;
-    }
-    else
-    {
-        pThread->pPrev->pNext = pThread->pNext;
-        pThread->pNext->pPrev = pThread->pPrev;
-        Semaphore->pThread    = pThread->pNext;
-    }
+     */    
+    list_del(&pThread->Node);
     
     /*
      * 5) 收取信号量
@@ -354,8 +324,7 @@ int semaphore_post(SEMAPHORE Semaphore)
      */
     Key = atom_operate_lock();
     Semaphore->Counter++;
-    pThread = Semaphore->pThread;
-    if (NULL == pThread)                                                    /* 如果没有线程处于等待状态             */
+    if (list_empty(&Semaphore->WaitHead))
     {
         atom_operate_unlock(Key);
         return OK;
@@ -365,21 +334,10 @@ int semaphore_post(SEMAPHORE Semaphore)
      * 2) 线程就绪
      *    将线程控制表插入到指定线程队列
      */
+    pThread = container_of(&Semaphore->WaitHead.next->next, THREAD, Node);
     Priority = pThread->Priority;
-    if (NULL == OS_ActiveProc[Priority])
-    {   /* 由0个节点增加到1个节点 */
-        pThread->pNext = pThread;
-        pThread->pPrev = pThread;
-        OS_ActiveProc[Priority] = pThread;
-        OS_ActivePrio |= 1ul << Priority;                                   /* 设置优先级就绪标志                   */
-    }
-    else
-    {   /* 加在队列的后面 */
-        pThread->pPrev = OS_ActiveProc[Priority]->pPrev;
-        pThread->pNext = OS_ActiveProc[Priority];
-        OS_ActiveProc[Priority]->pPrev->pNext = pThread;
-        OS_ActiveProc[Priority]->pPrev = pThread;
-    }
+    list_add(&pThread->Node, &OS_ActiveProc[Priority]);
+    OS_ActivePrio |= 1ul << Priority;
     atom_operate_unlock(Key);
 
     /* 

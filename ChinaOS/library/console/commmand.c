@@ -62,6 +62,8 @@ China Operating System [版本: 1.1]\r\n\
 
 extern int                  aConsoleServices$$Base;                         /* 合并节的开始地址                     */
 extern int                  aConsoleServices$$Limit;                        /* 合并节的末尾的后面的字节的地址       */
+extern int                  aDeviceList$$Base;                              /* 设备列表起始地址                     */
+extern int                  aDeviceList$$Limit;                             /* 设备列表结束地址                     */
 
 /*********************************************************************************************************************
 ** Function name:           service_version
@@ -85,7 +87,7 @@ int version(char *Option)
     
     return OK;
 }
-EXPORT_TO_CONSOLE("版本信息", version);
+EXPORT_TO_COMMAND("版本信息", version);
 
 /*********************************************************************************************************************
 ** Function name:           time
@@ -113,7 +115,7 @@ int time(char *Option)
     printk("当前时间: %2d:%2d:%2d\r\n", Time.Hour, Time.Minute, Time.Second);
     return OK;
 }
-EXPORT_TO_CONSOLE("当前时间", time);
+EXPORT_TO_COMMAND("当前时间", time);
 
 /*********************************************************************************************************************
 ** Function name:           clear
@@ -137,7 +139,7 @@ int clear(char *Option)
     
     return OK;
 }
-EXPORT_TO_CONSOLE("清屏", clear);
+EXPORT_TO_COMMAND("清屏", clear);
 
 /*********************************************************************************************************************
 ** Function name:           help
@@ -171,7 +173,7 @@ int help(char *Option)
     
     return OK;
 }
-EXPORT_TO_CONSOLE("帮助", help);
+EXPORT_TO_COMMAND("帮助", help);
 
 /*********************************************************************************************************************
 ** Function name:           count_used_stack_size
@@ -234,7 +236,7 @@ int thread(char *Option)
     
     return OK;
 }
-EXPORT_TO_CONSOLE("线程信息", thread);
+EXPORT_TO_COMMAND("线程信息", thread);
 
 /*********************************************************************************************************************
 ** Function name:           kill_thread
@@ -264,6 +266,42 @@ const SERVICE ServiceKill SECTION("aConsoleServices")=               \
     "清除线程",                                                      \
     kill_thread                                                      \
 };
+
+/*********************************************************************************************************************
+** Function name:           device
+** Descriptions:            输出设备列表
+** Input parameters:        
+** Output parameters:       
+** Returned value:          ==OK : success.
+**                          !=OK : failure.
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-11-27  10:3:55
+** Test recorde:            [编码]->走读->复查->单元测试
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+static int device(char *pOption)
+{
+    DEVICE          *pDevice;
+    DEVICE          *pStart;
+    DEVICE          *pEnd;
+
+
+    printk(" 设备对象       功能描述\r\n"
+           "--------------------------------------\r\n");
+    pStart = (DEVICE*)&aDeviceList$$Base;
+    pEnd   = (DEVICE*)&aDeviceList$$Limit;
+    for(pDevice = pStart; pDevice < pEnd; pDevice++)
+    {
+        printk("%-16s:%-16s\r\n", pDevice->pName, pDevice->pDescription);
+    }
+
+    return OK;
+}
+EXPORT_TO_COMMAND("设备列表", device);
 
 /*********************************************************************************************************************
                                                     END OF FILE

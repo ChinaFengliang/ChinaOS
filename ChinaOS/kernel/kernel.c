@@ -38,6 +38,7 @@
 #include    <library/malloc/malloc.h>
 #include    <library/misc/misc.h>
 #include    <library/bit/bit.h>
+#include    <library/link/list.h>
 #include    <device.h>
 
 /*********************************************************************************************************************
@@ -64,14 +65,14 @@ typedef     struct __idle_pcl                       IDLE_PCL;               /* ¿
 /*********************************************************************************************************************
                                                   È«¾Ö±äÁ¿¶¨ÒåÇø
 *********************************************************************************************************************/
-INT32U      OS_ActivePrio;                                                  /* ¼¤»îµÄÓÅÏÈ¼¶Î»±êÖ¾                   */
-THREAD     *OS_ActiveProc[33];                                              /* ¼¤»îµÄÏß³Ì¶ÓÁÐ                       */
-THREAD     *OS_This;                                                        /* µ±Ç°ÔËÐÐµÄÏß³Ì                       */
-THREAD     *OS_LiveList;                                                    /* ¼¤»îÏß³ÌÁ´±í                         */
+INT32U                  OS_ActivePrio;                                      /* ¼¤»îµÄÓÅÏÈ¼¶Î»±êÖ¾                   */
+struct list_head        OS_ActiveProc[33];                                  /* ¼¤»îµÄÏß³Ì¶ÓÁÐ                       */
+THREAD                 *OS_This;                                            /* µ±Ç°ÔËÐÐµÄÏß³Ì                       */
+THREAD                 *OS_LiveList;                                        /* ¼¤»îÏß³ÌÁ´±í                         */
 
-static      THREAD      *OS_DeadList;                                       /* ½©Ê¬Ïß³ÌÁ´±í                         */
-static      IDLE_PCL     OS_Idle;                                           /* ¿ÕÏÐÏß³Ì¿ØÖÆ±í                       */
-static      REGISTER     OS_aIdleStack[THREAD_IDLE_STACK_SIZE];             /* ¿ÕÏÐÏß³ÌÕ»                           */
+struct list_head        OS_DeadList;                                        /* ½©Ê¬Ïß³ÌÁ´±í                         */
+static THREAD           OS_Idle;                                            /* ¿ÕÏÐÏß³Ì¿ØÖÆ±í                       */
+static REGISTER         OS_aIdleStack[THREAD_IDLE_STACK_SIZE];              /* ¿ÕÏÐÏß³ÌÕ»                           */
 
 /*********************************************************************************************************************
 ** Function name:           main
@@ -128,6 +129,30 @@ STATUS mallocor_setup(void);
 *********************************************************************************************************************/
 REGISTER *stack_init(int (*pProcess)(void *), void *pOption, void *pStackBottom);
 
+
+/*********************************************************************************************************************
+** Function name:           thread_wakeup
+** Descriptions:            Ïß³Ì
+** Input parameters:        
+** Output parameters:       
+** Returned value:          
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-11-27  0:7:10
+** Test recorde:            
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+INLINE void vivify_thread(THREAD *pControl, INT32U Priority)
+{
+    list_del(&pControl->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
+    {
+        OS_ActivePrio &= ~(1ul << Priority);                                /* Çå³ý¾ÍÐ÷±êÖ¾                         */
+    }
+}
 
 /*********************************************************************************************************************
 ** Function name:           thread_register
@@ -227,18 +252,13 @@ void exit(INT32S Info)
     Priority = pThread->Priority;
     Key = atom_operate_lock();    
     thread_unregister(pThread);
-    if (pThread == pThread->pNext)
-    {   /* Î¨Ò»½Úµã */
-        OS_ActiveProc[Priority] = NULL;
-        OS_ActivePrio &= ~(1ul << Priority);                                /* Çå³ý¾ÍÐ÷±êÖ¾                         */
+
+    list_del(&pThread->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
+    {   
+        OS_ActivePrio &= ~(1ul << Priority);
     }
-    else
-    {   /* ·ÇÎ¨Ò»½Úµã */
-        pThread->pPrev->pNext   = pThread->pNext;
-        pThread->pNext->pPrev   = pThread->pPrev;
-        OS_ActiveProc[Priority] = pThread->pNext;                           /* ¸üÐÂÏß³Ì×éÖ¸Õë                       */
-    }
-    
+
     /*
      * É¾³ýÏß³Ì×ÊÔ´
      * 1) Ïß³Ì¶¨Ê±Æ÷;
@@ -248,20 +268,7 @@ void exit(INT32S Info)
     /*
      * ²åÈëµ½½©Ê¬Ïß³ÌÁ´±í,µÈ´ýÏµÍ³»ØÊÕÏß³Ì×ÊÔ´.
      */
-    if (NULL == OS_DeadList)
-    {
-        pThread->pNext = pThread;
-        pThread->pPrev = pThread;
-        OS_DeadList    = pThread;
-    }
-    else
-    {   /* ¼ÓÔÚ¶ÓÁÐµÄºóÃæ */
-        pThread->pPrev = OS_DeadList->pPrev;
-        pThread->pNext = OS_DeadList;
-        OS_DeadList->pPrev->pNext = pThread;
-        OS_DeadList->pPrev = pThread;
-    }
-    
+    list_add(&pThread->Node, &OS_DeadList);
     atom_operate_unlock(Key);
 
    /* 
@@ -319,17 +326,13 @@ STATUS kill(INT32S Thread)
     Key = atom_operate_lock();
     thread_unregister(pThread);
     Priority = pThread->Priority;
-    if (pThread == pThread->pNext)
+
+    list_del(&pThread->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
     {
-        OS_ActiveProc[Priority] = NULL;
         OS_ActivePrio &= ~(1ul << Priority);                                /* Çå³ý¾ÍÐ÷±êÖ¾                         */
     }
-    else
-    {
-        pThread->pPrev->pNext   = pThread->pNext;
-        pThread->pNext->pPrev   = pThread->pPrev;
-        OS_ActiveProc[Priority] = pThread->pNext;                           /* ¸üÐÂÏß³Ì×éÖ¸Õë                       */
-    }
+
     OS_timer_del(&pThread->Timer);                                          /* É¾³ýÏß³Ì¶¨Ê±Æ÷                       */
     atom_operate_unlock(Key);
     
@@ -337,6 +340,8 @@ STATUS kill(INT32S Thread)
 
     return OK;
 }
+
+
 
 /*********************************************************************************************************************
 ** Function name:           signal
@@ -373,7 +378,7 @@ INT32S signal(INT32S SigNum, void *pFunction)
             break;
 
         case SIG_KILL :
-            /* */
+            /* ÉèÖÃ±»É±ºó»Øµ÷º¯Êý */
             This->pKill = (void(*)(void))pFunction;
             break;
 
@@ -383,7 +388,6 @@ INT32S signal(INT32S SigNum, void *pFunction)
 
     return OK;
 }
-
 
 /*********************************************************************************************************************
 ** Function name:           shift_thread
@@ -407,7 +411,7 @@ REGISTER * shift_thread(REGISTER *pStackTop)
     OS_This->pStackTop = pStackTop;                                         /* ±£´æµ±Ç°Ïß³ÌµÄÕ»¶¥Ö¸Õë               */
 
     Priority = bit_scan_forward(OS_ActivePrio);
-    OS_This  = OS_ActiveProc[Priority];
+    OS_This  = container_of(&OS_ActiveProc[Priority].next->next, THREAD, Node);
 
     return OS_This->pStackTop;
 }
@@ -508,21 +512,8 @@ INT32S labour(const char   *pName,
      * 2) ×¢²áÏß³Ì
      * ½«Ïß³Ì¿ØÖÆ±í²åÈëµ½Ö¸¶¨Ïß³Ì¶ÓÁÐ
      */
-    if (NULL == OS_ActiveProc[Priority])
-    {   /* ÓÉ0¸ö½ÚµãÔö¼Óµ½1¸ö½Úµã */
-        pControl->pNext = pControl;
-        pControl->pPrev = pControl;
-        OS_ActiveProc[Priority] = pControl;
-    }
-    else
-    {   /* ¼ÓÔÚ¶ÓÁÐµÄºóÃæ */
-        pControl->pPrev = OS_ActiveProc[Priority]->pPrev;
-        pControl->pNext = OS_ActiveProc[Priority];
-        OS_ActiveProc[Priority]->pPrev->pNext = pControl;
-        OS_ActiveProc[Priority]->pPrev = pControl;
-    }
-
-    OS_ActivePrio |= 1ul << Priority;                                       /* ÉèÖÃÓÅÏÈ¼¶¾ÍÐ÷±êÖ¾                   */
+    list_add(&pControl->Node, &OS_ActiveProc[Priority]);
+    OS_ActivePrio |= 1ul << Priority;
     
     /*
      * 3) µ÷¶È¾ö²ß
@@ -646,25 +637,15 @@ static int idle(void *option)
 
     while (1)
     {
+        struct list_head        *pNode;
         /*
          * 2) ÊÍ·ÅÏß³Ì¿Õ¼ä
          */
-        if (NULL != OS_DeadList)
+        list_for_each(pNode, &OS_DeadList)
         {
-            THREAD *pThread = OS_DeadList;
+            THREAD *pThread = container_of(&pNode->next, THREAD, Node);
 
-            /* 3) ´ÓÁ´±íÖÐ½â³ý */
-            if (pThread == pThread->pNext)
-            {
-                OS_DeadList = NULL;
-            }
-            else
-            {
-                pThread->pPrev->pNext = pThread->pNext;
-                pThread->pNext->pPrev = pThread->pPrev;
-                OS_DeadList = pThread->pNext;
-            }
-            /* 4) ÊÍ·ÅÏß³Ì¿Õ¼ä */
+            list_del(&pThread->Node);
             free(pThread);
         }
         
@@ -692,7 +673,8 @@ static int idle(void *option)
 **--------------------------------------------------------------------------------------------------------------------
 *********************************************************************************************************************/
 INT32S sleep(INT32U Time)
-{
+{    
+    THREAD     *pThread;                                                    /* Ïß³Ì¿ØÖÆ¿é                           */
     INT32U      Priority;                                                   /* ÓÅÏÈ¼¶                               */
     int         Key;
 
@@ -705,29 +687,22 @@ INT32S sleep(INT32U Time)
 
    /* 
     * 1) ½«µ±Ç°Ïß³Ì¹ÒÆð,É¾³ýÔËÐÐ¿ØÖÆµÇ¼Ç±í.
-    */
+    */  
+    pThread = OS_This;  
+    Priority = pThread ->Priority;
+
     Key = atom_operate_lock();
-    Priority = OS_This->Priority;
-    if (OS_This == OS_This->pNext)
-    {   /* Î¨Ò»½Úµã */
-        OS_ActiveProc[Priority] = NULL;
-        OS_ActivePrio &= ~(1ul << Priority);                                /* Çå³ý¾ÍÐ÷±êÖ¾                         */
+    list_del(&pThread->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
+    {   
+        OS_ActivePrio &= ~(1ul << Priority);
     }
-    else
-    {   /* ·ÇÎ¨Ò»½Úµã */
-        OS_This->pPrev->pNext   = OS_This->pNext;
-        OS_This->pNext->pPrev   = OS_This->pPrev;
-        OS_ActiveProc[Priority] = OS_This->pNext;                           /* ¸üÐÂÏß³Ì×éÖ¸Õë                       */
-    }
-    
-   /* 
-    * 2) Ìí¼Ó»½ÐÑ¶¨Ê±Æ÷
-    */
+
     OS_timer_add(&OS_This->Timer, Time);
     atom_operate_unlock(Key);   
    
    /* 
-    * 3) ÇÐ»»Ïß³Ì
+    * 2) ÇÐ»»Ïß³Ì
     */
     OS_thread_switch();                                                     /* ÇÐ»»µ½ÆäËüÏß³Ì                       */
 
@@ -761,43 +736,6 @@ INT32S wakeup(INT32S Thread)
     return ERR;
 }
 
-#if 0
-/*********************************************************************************************************************
-** Function name:           check_need_to_sched
-** Descriptions:            ¼ì²éÊÇ·ñÐèÒªÇÐ»»Ïß³Ì
-** Input parameters:
-** Output parameters:
-** Returned value:          ==0 : ²»ÐèÒªÇÐ»»
-**                          ==1 : ÐèÒªÇÐ»»
-**--------------------------------------------------------------------------------------------------------------------
-** Created by:              Fengliang
-** Created Date:            2011-1-4  15:37:14
-** Test recorde:
-**--------------------------------------------------------------------------------------------------------------------
-** Modified by:
-** Modified date:
-** Test recorde:
-*********************************************************************************************************************/
-BOOL check_need_to_sched(void)
-{
-    /*
-     * Èç¹û·µ»Øµ±Ç°Ïß³ÌÔò²»ÐèÒªÇÐ»»,·ñÔò½øÐÐÇÐ»».
-     *
-     * ÎÊ: ÔõÑùÅÐ¶ÏÖÐ¶Ï·þÎñºóÊÇ·ñÓ¦¸ÃÇÐ»»?
-     * ½â: OS_This == µ÷¶ÈËã·¨ÍÆÑ¡µÄÏß³Ì¿ØÖÆ¿é.
-     */
-
-
-    INT32S          Priority;
-    THREAD         *pThread;
-
-    Priority = bit_scan_forward(OS_ActivePrio);
-    pThread = OS_ActiveProc[Priority];
-    
-    return (pThread != OS_This);
-}
-#endif
-
 /*********************************************************************************************************************
 ** Function name:           startup
 ** Descriptions:            Æô¶¯ChinaOS²Ù×÷ÏµÍ³
@@ -816,14 +754,18 @@ BOOL check_need_to_sched(void)
 void startup(void)
 {
     REGISTER            *pStackBottom;
-
+    int                  i;
+    
     
     /*
      * 1) ¸´Î»¹ÜÀíÐÅÏ¢
      */
-    OS_ActivePrio = 0;                                                      /* Çå¿ÕÊÂ¼þ¾ÍÐ÷±í                       */
-    OS_DeadList   = NULL;
-    memset(OS_ActiveProc, NULL, sizeof(OS_ActiveProc));                     /* ÇåÁã¿ØÖÆ¿éÄÚÈÝ                       */
+    OS_ActivePrio = 0;
+    INIT_LIST_HEAD(&OS_DeadList);
+    for (i = 0; i < 33; i++)
+    {
+        INIT_LIST_HEAD(&OS_ActiveProc[i]);
+    }
     
     /*
      * 2) ¹¹½¨¿ÕÏÐÏß³Ì
@@ -836,7 +778,9 @@ void startup(void)
     OS_Idle.pStackTop = stack_init(idle, NULL, pStackBottom);
     OS_Idle.Priority  = 32;
     OS_Idle.pName     = "idle";
-    OS_This = OS_ActiveProc[32] = (THREAD *)&OS_Idle;
+
+    list_add(&OS_Idle.Node, &OS_ActiveProc[32]);
+    OS_This = &OS_Idle;
 
     thread_register(OS_This);
     

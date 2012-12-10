@@ -48,6 +48,11 @@ struct __class_led
 };
 typedef struct __class_led                        CLASS_LED;                /* 指示灯类型                           */
 
+struct switch_t
+{
+    void   (*on)(void);                                                     /* 打开                                 */
+    void   (*off)(void);                                                    /* 关闭                                 */
+};
 
 #ifdef __cplusplus
 }

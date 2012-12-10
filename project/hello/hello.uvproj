@@ -401,6 +401,11 @@
               <FilePath>X:\ChinaOS\ChinaOS\architecture\arm\cortex-m3\nxp\lpc1766\system_init.c</FilePath>
             </File>
             <File>
+              <FileName>memory.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\ChinaOS\architecture\arm\cortex-m3\nxp\lpc1766\can_repeater\memory.c</FilePath>
+            </File>
+            <File>
               <FileName>syscall.s</FileName>
               <FileType>2</FileType>
               <FilePath>..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s</FilePath>
@@ -967,6 +972,11 @@
               <FileName>system_init.c</FileName>
               <FileType>1</FileType>
               <FilePath>X:\ChinaOS\ChinaOS\architecture\arm\cortex-m3\nxp\lpc1766\system_init.c</FilePath>
+            </File>
+            <File>
+              <FileName>memory.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\ChinaOS\architecture\arm\cortex-m3\nxp\lpc1766\can_repeater\memory.c</FilePath>
             </File>
             <File>
               <FileName>syscall.s</FileName>

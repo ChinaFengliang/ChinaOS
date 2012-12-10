@@ -35,8 +35,10 @@
 #include    <include/debug.h>
 #include    <kernel/semaphore/semaphore.h>
 #include    <library/misc/misc.h>
+#include    <library/memory.h>
 #include    <library/ioport.h>
 #include    <library/bit/bit.h>
+#include    <library/link/list.h>
 
 
 /*********************************************************************************************************************
@@ -44,7 +46,7 @@
 *********************************************************************************************************************/
 /*
  |- 1) ÄÚ´æ³Ø
- |       ±¾ÄÚ´æ·ÖÅäÆ÷Ö§³Ö¶Ô¶à¸öÄÚ´æ¶Î½øÐÐ¹ÜÀí.
+ |       ±¾ÄÚ´æ·ÖÅäÆ÷Ö§³Ö¶Ô¶à¸öÄÚ´æ³Ø½øÐÐ¹ÜÀí.
  |                                           << ÄÚ´æ³Ø¾µÏñ >>
  |                   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ low
  |       StartAddr ->|                          ÄÚ´æ³Ø¿Õ¼ä                           .
@@ -60,7 +62,7 @@
  |                   .                                                               .                             
  |                   +~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~+
  |       ×¢: 
- |           ÄÚ´æÇø¼ä: [StartAddr, EndAddr)
+ |           ÄÚ´æ³ØÇø¼ä: [StartAddr, EndAddr)
  |
  |- 2) ÄÚ´æ¿é
  |       ÄÚ´æ¿éÊÇ·ÖÅäÆ÷¿É·ÖÅäµÄ×îÐ¡ÔªËØ.
@@ -95,38 +97,38 @@
 /* ºê¶ÎÃû ----------------------------------------------------------------------------------------------------------*/
 #define FREE                            0ul                                 /* ¿ÕÏÐ                                 */
 #define USED                            1ul                                 /* Õ¼ÓÃ                                 */
-#define MIN_CHUNK_SIZE                 16ul                                 /* ×îÐ¡chunkÄÚ´æ¿Õ¼ä´óÐ¡                */
+#define MIN_CHUNK_SIZE                  sizeof(CHUNK)                       /* ×îÐ¡¿É·ÖÅäÄÚ´æ¿é´óÐ¡                 */
 
 /* mask with all bits to left of least bit of x on */
-#define left_bits(x)         ((x<<1) | -(x<<1))
+#define left_bits(x)                    ((x<<1) | -(x<<1))
+#define to_memory_size(ChunkSize)       ((ChunkSize) - sizeof(struct chunk_head))
 
 /*********************************************************************************************************************
                                                     ÀàÐÍ¶¨ÒåÇø
 *********************************************************************************************************************/
-/* ÄÚ´æ³ØÀàÐÍ ------------------------------------------------------------------------------------------------------*/
-struct __segment
+/* Õ¼ÓÃÄÚ´æ¿éÕªÒªÀàÐÍ ----------------------------------------------------------------------------------------------*/
+struct chunk_head
 {
-    void               *pStartAddr;                                         /* ÄÚ´æ¶ÎÆðÊ¼µØÖ·(°üÀ¨)                 */
-    void               *pEndAddr;                                           /* ÄÚ´æ¶Î½áÊøµØÖ·(²»°üÀ¨)               */
+    INT32U              PrevInfo;                                           /* Ç°¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
+    INT32U              ThisInfo;                                           /* ±¾¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
 };
-typedef struct __segment                            SEGMENT;                /* ÄÚ´æ¶Î¶ÔÏóÀàÐÍ                       */
 
-/* ÄÚ´æ³ØÀàÐÍ ------------------------------------------------------------------------------------------------------*/
+/* ¿ÕÏÐÄÚ´æ¿éÕªÒªÀàÐÍ ----------------------------------------------------------------------------------------------*/
 struct __chunk
 {
-    INT32U              PrevInfo;                                           /* Ç°¿é¿Õ¼äÐÅÏ¢(´óÐ¡ + ×´Ì¬)            */
-    INT32U              ThisInfo;                                           /* ±¾¿é¿Õ¼äÐÅÏ¢(´óÐ¡ + ×´Ì¬)            */
+    INT32U              PrevInfo;                                           /* Ç°¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
+    INT32U              ThisInfo;                                           /* ±¾¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
     
     struct __chunk     *pFreeNext;                                          /* ÏÂÒ»¿ÕÏÐ¿éµØÖ·                       */
     struct __chunk     *pFreePrev;                                          /* ÉÏÒ»¿ÕÏÐ¿éµØÖ·                       */
 };
-typedef struct __chunk                              CHUNK;                  /* ÄÚ´æ¿éÐÅÏ¢ÀàÐÍ                       */
+typedef struct __chunk                              CHUNK;                  /* ÄÚ´æ¿éÕªÒªÀàÐÍ                       */
 
-/* ÄÚ´æ·ÖÅäÆ÷ÀàÐÍ --------------------------------------------------------------------------------------------------*/
+/* Ê÷ÐÍ½Úµã¿éÀàÐÍ --------------------------------------------------------------------------------------------------*/
 struct __tree_node
 {
-    INT32U              PrevInfo;                                           /* Ç°¿é¿Õ¼äÐÅÏ¢(´óÐ¡ + ×´Ì¬)            */
-    INT32U              ThisInfo;                                           /* ±¾¿é¿Õ¼äÐÅÏ¢(´óÐ¡ + ×´Ì¬)            */
+    INT32U              PrevInfo;                                           /* Ç°¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
+    INT32U              ThisInfo;                                           /* ±¾¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
     struct __tree_node *pFreeNext;                                          /* ÏÂÒ»¿ÕÏÐ¿éµØÖ·                       */
     struct __tree_node *pFreePrev;                                          /* ÉÏÒ»¿ÕÏÐ¿éµØÖ·                       */
 
@@ -142,9 +144,6 @@ struct __memory_allocor
     INT32U              SameMap;                                            /* Í¬ÐÍÄÚ´æÈÝÆ÷×é×´Ì¬Î»Í¼               */
     INT32U              TreeMap;                                            /* Ê÷ÐÍÄÚ´æÈÝÆ÷×é×´Ì¬Î»Í¼               */
 
-    CHUNK              *pRecent;                                            /* ×î½üÊ¹ÓÃ¿éµØÖ·                       */
-    INT32U              SpareSize;                                          /* Ê£Óà¿Õ¼ä´óÐ¡(Òò·ÖÅäÐ¡¿é¶øÊ£Óà)       */
-
     CHUNK              *pSameChunks[32*2 + 2];                              /* Í¬ÐÍÄÚ´æÈÝÆ÷×é                       */
     TNODE              *pTreeChunks[32];                                    /* Ê÷ÐÍÄÚ´æÈÝÆ÷×é                       */
 };
@@ -153,51 +152,11 @@ typedef struct __memory_allocor                     MALLOCOR;               /* Ä
 /*********************************************************************************************************************
                                                   È«¾Ö±äÁ¿¶¨ÒåÇø
 *********************************************************************************************************************/
-extern void                *Image$$HeapBase1$$Base;                         /* ¶ÑÇø1»ùÖ·                            */
-extern void                *Image$$HeapBase2$$Base;                         /* Õ»Çø2»ùÖ·                            */
 static MALLOCOR             Mallocor;                                       /* ÄÚ´æ·ÖÅäÆ÷                           */
-static struct __semaphore   AccessLock;                                     /* ·ÃÎÊËø                               */
-static const SEGMENT        aMemorySegments[] =                             /* ÄÚ´æ¶ÎÁÐ±í                           */
-{
-    {&Image$$HeapBase1$$Base, (void *)0x10008000},
-    {&Image$$HeapBase2$$Base, (void *)0x20084000},
-};
-
+static struct semaphore     AccessLock;                                     /* ·ÃÎÊËø                               */
 
 /*********************************************************************************************************************
-** Function name:           heap
-** Descriptions:            
-** Input parameters:        
-** Output parameters:       
-** Returned value:          ==OK : ²Ù×÷³É¹¦
-**                          !=OK : ²Ù×÷Ê§°Ü(°üº¬³ö´íÐÅÏ¢)
-**--------------------------------------------------------------------------------------------------------------------
-** Created by:              Feng Liang
-** Created Date:            2011-12-4  15:40:57
-** Test recorde:            
-**--------------------------------------------------------------------------------------------------------------------
-** Modified by:
-** Modified date:
-** Test recorde: 
-*********************************************************************************************************************/
-int heap(char *Option)
-{
-    int         i;
-
-
-    for (i = 0; i < sizeof(aMemorySegments)/sizeof(SEGMENT); i++)
-    {
-        printk("ÄÚ´æ¿Õ¼ä%d:[0x%X,0x%X] ¹²%dK×Ö½Ú\r\n", i, 
-               (INT32U)aMemorySegments[i].pStartAddr, (INT32U)aMemorySegments[i].pEndAddr, 
-               (((INT32U)aMemorySegments[i].pEndAddr - (INT32U)aMemorySegments[i].pStartAddr)>>10));
-    }
-    
-    return OK;
-}
-EXPORT_TO_CONSOLE("ÄÚ´æ¿Õ¼ä", heap);
-
-/*********************************************************************************************************************
-** Function name:           get_chunk
+** Function name:           get_same_chunk_group
 ** Descriptions:            »ñÈ¡Í¬ÐÍÄÚ´æÈÝÆ÷ÐÅÏ¢
 ** Input parameters:        Index : ÄÚ´æÈÝÆ÷Ë÷Òý
 ** Output parameters:       
@@ -211,9 +170,75 @@ EXPORT_TO_CONSOLE("ÄÚ´æ¿Õ¼ä", heap);
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-INLINE CHUNK * get_chunk(INT32U Index)
+INLINE CHUNK * get_same_chunk_group(INT32U Index)
 {
     return (CHUNK *)&(Mallocor.pSameChunks[Index << 1]);
+}
+
+/*********************************************************************************************************************
+** Function name:           splite_free_chunk
+** Descriptions:            ½«Ò»¿é¿ÕÏÐÄÚ´æ¿é·Ö¸îÎªÒ»¿éÕ¼ÓÃÄÚ´æ¿éºÍÒ»¿é¿ÕÏÐÄÚ´æ¿é. ·µ»Ø·Ö¸îºó¿ÕÏÐÄÚ´æ¿éÖ¸Õë.
+** Input parameters:        pFreeChunk : ±»·Ö¸î¿ÕÏÐÄÚ´æ¿é
+**                          ChunkSize  : ÆÚÍû·Ö¸îÄÚ´æ¿é´óÐ¡
+** Output parameters:       
+** Returned value:          ==NULL : ·Ö¸îºóÎÞ¿ÕÏÐ¿é.
+**                          !=NULL : ¿ÕÏÐÄÚ´æ¿éÖ¸Õë.
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-12-5  18:40:8
+** Test recorde:            ±àÂë->×ß¶Á->¸´²é->µ¥Ôª²âÊÔ
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+CHUNK * splite_free_chunk(CHUNK * pFreeChunk, INT32U ChunkSize)
+{
+    CHUNK *                 pNextChunk;
+    INT32U                  FreeSize;                                       /* Ê£Óà¿Õ¼ä´óÐ¡                         */
+
+    
+    FreeSize = pFreeChunk->ThisInfo;
+    pNextChunk = (CHUNK *)((char *)pFreeChunk + FreeSize);
+    if (FreeSize - ChunkSize < MIN_CHUNK_SIZE)
+    {
+        pFreeChunk->ThisInfo = pNextChunk->PrevInfo = FreeSize | USED;
+        pFreeChunk = NULL;
+    }
+    else
+    {
+        CHUNK *             pRestChunk;
+        INT32U              RestSize = FreeSize - ChunkSize;
+        
+        pRestChunk = (CHUNK *)((char *)pFreeChunk + ChunkSize);
+        pFreeChunk->ThisInfo = pRestChunk->PrevInfo = ChunkSize | USED;
+
+        pFreeChunk = pRestChunk;
+        pFreeChunk->ThisInfo = pNextChunk->PrevInfo = RestSize | FREE;
+    }
+    
+    return pFreeChunk;
+}
+
+/*********************************************************************************************************************
+** Function name:           combin_free_chunk
+** Descriptions:            ½«Á½¿é¿ÕÏÐÄÚ´æ¿é×éºÏ³ÉÒ»¿é¿ÕÏÐÄÚ´æ¿é. ·µ»Ø×éºÏºó¿ÕÏÐÄÚ´æ¿éÖ¸Õë.
+** Input parameters:        
+** Output parameters:       
+** Returned value:          
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-12-5  18:44:17
+** Test recorde:            ±àÂë->×ß¶Á->¸´²é->µ¥Ôª²âÊÔ
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+CHUNK * combin_free_chunk(CHUNK * pThisChunk, CHUNK * pNewChunk)
+{
+    
+    return pThisChunk;
 }
 
 /*********************************************************************************************************************
@@ -234,7 +259,7 @@ INLINE CHUNK * get_chunk(INT32U Index)
 *********************************************************************************************************************/
 INLINE char * chunk_to_memeory(CHUNK *pChunk)
 {
-    return (char *)pChunk + (sizeof(INT32U)*2);                             /* ²Ã¼ôµôPrevInfoÓëThisInfo±êÊ¶¿Õ¼ä     */
+    return pChunk ? (char *)pChunk + (sizeof(INT32U)*2) : NULL;
 }
 
 /*********************************************************************************************************************
@@ -365,7 +390,7 @@ INLINE void insert_small_chunk(CHUNK *pChunk, INT32U Size)
     
 
     Index = get_box_index(Size);    
-    pHead = get_chunk(Index);
+    pHead = get_same_chunk_group(Index);
     
     if (0 == test_bit(Mallocor.SameMap, Index))
     {
@@ -490,7 +515,7 @@ INLINE BOOL is_small(INT32U Size)
 }
 
 /*********************************************************************************************************************
-** Function name:           insert_chunk
+** Function name:           checkin_free_chunk
 ** Descriptions:            
 ** Input parameters:        pChunk : ÄÚ´æ¿é
 **                          ChunkSize : ÄÚ´æ¿é´óÐ¡(°üº¬Ê×²¿ÐÅÏ¢¿Õ¼ä)
@@ -505,49 +530,42 @@ INLINE BOOL is_small(INT32U Size)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-static void insert_chunk(CHUNK *pChunk, INT32U ChunkSize)
+static void checkin_free_chunk(CHUNK *pChunk, INT32U ChunkSize)
 {    
     INT32U          Size;
 
 
-    Size = ChunkSize - 8;                                                   /* È¥³ý±êÊ¶·û¿Õ¼ä´óÐ¡                   */
-    
-    if (is_small(Size))
-    {
-        insert_small_chunk(pChunk, Size);
-    }
-    else 
-    { 
-        TNODE *pTreeNode = (TNODE *)pChunk;
-        insert_large_chunk(pTreeNode, Size);
+    if (NULL != pChunk)
+    {    
+        Size = ChunkSize - 8;                                                   /* È¥³ý±êÊ¶·û¿Õ¼ä´óÐ¡                   */
+        
+        if (is_small(Size))
+        {
+            insert_small_chunk(pChunk, Size);
+        }
+        else 
+        { 
+            TNODE *pTreeNode = (TNODE *)pChunk;
+            insert_large_chunk(pTreeNode, Size);
+        }
     }
 }
 
 /*********************************************************************************************************************
-** Function name:           update_temporary_chunk
-** Descriptions:            ¸üÐÂÁÙÊ±¿é
+** Function name:           letfmost_child
+** Descriptions:            ²éÕÒ×î×ó²à½Úµã, Èç¹ûÃ»ÓÐ×ó²à½Úµã, Ôò·µ»ØÓÒ²à½Úµã.
 ** Input parameters:        
 ** Output parameters:       
 ** Returned value:          
 **--------------------------------------------------------------------------------------------------------------------
-** Created by:              Fengliang
-** Created Date:            2011-3-26  18:11:39
-** Test recorde:            
+** Created by:              Feng Liang
+** Created Date:            2012-12-5  21:20:35
+** Test recorde:            ±àÂë->×ß¶Á->¸´²é->µ¥Ôª²âÊÔ
 **--------------------------------------------------------------------------------------------------------------------
-** Modified by:
-** Modified date:
-** Test recorde: 
+** Modified by:             
+** Modified date:           
+** Test recorde:            
 *********************************************************************************************************************/
-void update_temporary_chunk(CHUNK *pChunk, INT32U Size)
-{
-    if (Mallocor.SpareSize)
-    {
-        insert_chunk(Mallocor.pRecent, Mallocor.SpareSize);
-    }
-    Mallocor.pRecent   = pChunk;
-    Mallocor.SpareSize = Size;
-}
-
 INLINE TNODE *letfmost_child(TNODE *pTreeNode)
 {
     return pTreeNode->pChild[0] != NULL ? pTreeNode->pChild[0] : pTreeNode->pChild[1];
@@ -690,7 +708,7 @@ INLINE void unlink_large_chunk(TNODE* pChunk)
 
 /*********************************************************************************************************************
 ** Function name:           unlink_chunk
-** Descriptions:            
+** Descriptions:            unlink the free chunk from memory list.
 ** Input parameters:        
 ** Output parameters:       
 ** Returned value:          
@@ -707,7 +725,6 @@ INLINE void unlink_chunk(CHUNK *pChunk, INT32U Size)
 {
     if (is_small(Size))
     {
-
         unlink_small_chunk(pChunk, Size);
     }
     else
@@ -717,7 +734,42 @@ INLINE void unlink_chunk(CHUNK *pChunk, INT32U Size)
 }
 
 /*********************************************************************************************************************
-** Function name:           malloc_small_in_tree
+** Function name:           checkout_small_chunk_in_group
+** Descriptions:            Unlink the first chunk from a smallbin 
+** Input parameters:        pHead  : Ê×½Úµã
+**                          pChunk : Ä¿±ê½Úµã
+**                          Index  : ÏäË÷ÒýºÅ
+** Output parameters:       
+** Returned value:          
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Fengliang
+** Created Date:            2011-3-26  16:45:15
+** Test recorde:            
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:
+** Modified date:
+** Test recorde: 
+*********************************************************************************************************************/
+INLINE CHUNK * checkout_small_chunk_in_group(CHUNK *pHead, INT32U Index)
+{
+    CHUNK               *pNext, *pFirstChunk;
+
+    pFirstChunk = pHead->pFreeNext;
+    pNext = pFirstChunk->pFreeNext;
+    
+    if (pHead == pNext)                                                     /* ½ö´æÔÚÒ»¸ö¿ÕÏÐchunk                  */
+    {
+        Mallocor.SameMap &= ~(1ul << Index);
+    }
+
+    pHead->pFreeNext = pNext;
+    pNext->pFreePrev = pHead;
+
+    return pFirstChunk;
+}
+
+/*********************************************************************************************************************
+** Function name:           checkout_small_chunk_in_tree
 ** Descriptions:            Ñ°ÕÒÊ÷Ä¿Â¼ÖÐ×îÐ¡µÄ½Úµã
 ** Input parameters:        Size : ¿Õ¼ä´óÐ¡(µ¥Î»: Byte)
 ** Output parameters:       
@@ -732,12 +784,11 @@ INLINE void unlink_chunk(CHUNK *pChunk, INT32U Size)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-static void* malloc_small_in_tree(INT32U Size)
+static CHUNK* checkout_small_chunk_in_tree(INT32U Size)
 {
     INT32U              Index;                                              /* Ë÷Òý                                 */
-    INT32U              ChunkSize;                                          /* ÄÚ´æ¿é¿Õ¼ä                           */
     INT32U              FreeSize;                                           /* ×îÐ¡²î¶î                             */
-    TNODE              *pTmp, *pChunk, *pNext;
+    TNODE              *pTmp, *pChunk;
     
     
     if (0 == Mallocor.TreeMap)
@@ -766,36 +817,13 @@ static void* malloc_small_in_tree(INT32U Size)
         }
     }
 
-    /*
-     * 3) ²ð·Ö×îÐ¡¿é¿Õ¼ä
-     */
-    ChunkSize = pChunk->ThisInfo;
-    pNext = (TNODE *)((INT32U)pChunk + ChunkSize);
     unlink_large_chunk(pChunk);
-    if (FreeSize - Size < MIN_CHUNK_SIZE)
-    {
-        /*
-         * ¶ÀÕ¼ÌìÏÂ
-         */
-        pChunk->ThisInfo = pNext->PrevInfo  = ChunkSize | USED;
-    }
-    else
-    {
-        /*
-         * ÌìÏÂ¶þ·Ö
-         */
-        TNODE *pFree = (TNODE *)((char *)pChunk + Size);
-        pFree->ThisInfo = pNext->PrevInfo = FreeSize - Size;
-        pChunk->ThisInfo = pFree->PrevInfo = Size | USED;
 
-        update_temporary_chunk((CHUNK *)pFree, FreeSize - Size);
-    }
-    
-    return (char *)pChunk + MIN_CHUNK_SIZE;
+    return (CHUNK *)pChunk;
 }
 
 /*********************************************************************************************************************
-** Function name:           tmalloc_large
+** Function name:           checkout_large_chunk_in_tree
 ** Descriptions:            allocate a large request from the best fitting chunk in a treebin
 ** Input parameters:        Size : ¿Õ¼ä´óÐ¡(µ¥Î»: Byte)
 ** Output parameters:       
@@ -810,7 +838,7 @@ static void* malloc_small_in_tree(INT32U Size)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-static void * malloc_large_in_tree(INT32U Size) 
+static CHUNK * checkout_large_chunk_in_tree(INT32U Size) 
 {
     INT32U       rsize = -Size;                                             /* ×îÐ¡²î¾à                             */
     TNODE       *pChunk = NULL;                                             /* ×î¼Ñ¿é                               */
@@ -884,63 +912,8 @@ static void * malloc_large_in_tree(INT32U Size)
         pTree = letfmost_child(pTree);
     }
 
-    /*
-     * Óëdv±È½Ï 
-     */
-    if (NULL != pChunk && rsize < (Mallocor.SpareSize - Size))
-    {
-        TNODE *pNext = (TNODE *)((char *)pChunk + rsize + Size);
-
-        unlink_large_chunk(pChunk);
-        if (rsize < MIN_CHUNK_SIZE)
-        {
-            pChunk->ThisInfo = pNext->PrevInfo = (rsize + Size) | USED;
-        }
-        else
-        {
-            TNODE *pFree = (TNODE *)((char *)pChunk + Size);
-
-            pFree->ThisInfo  = pNext->PrevInfo = rsize;
-            pChunk->ThisInfo = pFree->PrevInfo = Size | USED;
-
-            insert_chunk((CHUNK *)pFree, rsize);
-        }
-        return (char *)pChunk + MIN_CHUNK_SIZE; 
-    }
-    
-    return NULL;
-}
-
-/*********************************************************************************************************************
-** Function name:           unlink_first_small_chunk
-** Descriptions:            Unlink the first chunk from a smallbin 
-** Input parameters:        pHead  : Ê×½Úµã
-**                          pChunk : Ä¿±ê½Úµã
-**                          Index  : ÏäË÷ÒýºÅ
-** Output parameters:       
-** Returned value:          
-**--------------------------------------------------------------------------------------------------------------------
-** Created by:              Fengliang
-** Created Date:            2011-3-26  16:45:15
-** Test recorde:            
-**--------------------------------------------------------------------------------------------------------------------
-** Modified by:
-** Modified date:
-** Test recorde: 
-*********************************************************************************************************************/
-INLINE void unlink_first_small_chunk(CHUNK *pHead, CHUNK *pChunk, INT32U Index)
-{
-    CHUNK               *pNext;
-
-    pNext = pChunk->pFreeNext;
-    
-    if (pHead == pNext)                                                     /* ½ö´æÔÚÒ»¸ö¿ÕÏÐchunk                  */
-    {
-        Mallocor.SameMap &= ~(1ul << Index);
-    }
-
-    pHead->pFreeNext = pNext;
-    pNext->pFreePrev = pHead;
+    unlink_large_chunk(pChunk);
+    return (CHUNK *)pChunk; 
 }
     
 /*********************************************************************************************************************
@@ -962,21 +935,21 @@ INLINE void unlink_first_small_chunk(CHUNK *pHead, CHUNK *pChunk, INT32U Index)
 STATUS mallocor_setup(void)
 {
     int             i;
-
-    /*
-     * 1) ´´½¨¹ÜÀíÐÅºÅÁ¿
-     */    
-    AccessLock.Counter = 1;
-    AccessLock.pThread = NULL;
+    int             Counter;
     
-    memset(&Mallocor, 0, sizeof(Mallocor));                                 /* ÇåÁã·ÖÅäÆ÷¹ÜÀíÐÅÏ¢                   */
-
+    /*
+     * 1) ´´½¨¹ÜÀí·ÃÎÊËø
+     */
+    AccessLock.Counter = 1;
+    INIT_LIST_HEAD(&AccessLock.WaitHead);
+    
     /*
      * 2) ³õÊ¼»¯ÄÚ´æÈÝÆ÷×é
      */
+    memset(&Mallocor, 0, sizeof(Mallocor));                                 /* ÇåÁã·ÖÅäÆ÷¹ÜÀíÐÅÏ¢                   */
     for (i = 0; i < 32; i++)
     {
-        CHUNK *pChunk = get_chunk(i);
+        CHUNK *pChunk = get_same_chunk_group(i);
         pChunk->pFreeNext = pChunk;                                         /* ×éÖ¯»·ÐÎÁ´±íÍ·½Úµã                   */
         pChunk->pFreePrev = pChunk;
     }
@@ -984,7 +957,7 @@ STATUS mallocor_setup(void)
     /*
      * 3) ×¢²áËùÓÐÄÚ´æ³Ø
      */
-    for (i = 0; i < ARRAY_SIZE(aMemorySegments); i++)
+    for (Counter = i = 0; i < NumOfHeap; i++)
     {
         INT32U      StartAddr;                                              /* ÓÐÐ§¿Õ¼äÆðÊ¼µØÖ·                     */
         INT32U      EndAddr;                                                /* ÓÐÐ§¿Õ¼ä½áÊøµØÖ·                     */
@@ -996,12 +969,22 @@ STATUS mallocor_setup(void)
         /* ¶ÔÆëµ½ARMÏµÍ³×Ö¶ÔÆë¸ñÊ½ */
         StartAddr = align_upside(StartAddr, sizeof(INT32U));
         EndAddr   = align_downside(EndAddr, sizeof(INT32U));
+        if (EndAddr < StartAddr)
+        {
+            DBG_WARN("ÄÚ´æ³Ø[%d]·ÖÅä·Ç·¨¿Õ¼ä\r\n", i);
+            continue;
+        }
         
-        EndAddr  -= sizeof(INT32U) << 1;                                    /* ¼õÈ¥Î²²¿¿é±êÊ¶·û¿Õ¼äÎ»ÖÃ             */
+        EndAddr  -= sizeof(struct chunk_head);                              /* ¼õÈ¥Î²²¿¿é±êÊ¶·û¿Õ¼äÎ»ÖÃ             */
         ChunkSize = EndAddr - StartAddr;
+        if (ChunkSize < MIN_CHUNK_SIZE)
+        {
+            DBG_WARN("ÄÚ´æ³Ø[%d]¿Õ¼äÐ¡ÓÚ×îÐ¡·ÖÅäµ¥Ôª\r\n", i);
+            continue;
+        }
         
         /*
-         * 3.1) Éè¶¨ÄÚ´æ¿é±êÊ¶·ûÐÅÏ¢
+         * 3.1) Éè¶¨ÄÚ´æ¿éÕªÒªÐÅÏ¢
          *   a)±êÊ¶Ç°Ò»¿échunk¿Õ¼äÎª0×Ö½Ú,ÇÒÕ¼ÓÃ.ÒÔ×öÎªÇ°Ãæ±ß½ç±êÊ¶·û.
          *   b)±êÊ¶ºóÒ»¿échunk¿Õ¼äÎª0×Ö½Ú,ÇÒÕ¼ÓÃ.ÒÔ×öÎªºóÃæ±ß½ç±êÊ¶·û.
          */
@@ -1011,12 +994,16 @@ STATUS mallocor_setup(void)
         write_dword(EndAddr + sizeof(INT32U), 0ul | USED);                  /* ThisInfo                             */
 
         /*
-         * 3.2) ½«ÄÚ´æ¿é²åÈëµ½·ÖÅä±í
+         * 3.2) ½«¿ÕÏÐÄÚ´æ¿é²åÈëµ½·ÖÅä±í
          */
-        insert_chunk((CHUNK *)StartAddr, ChunkSize);
+        checkin_free_chunk((CHUNK *)StartAddr, ChunkSize);
+        Counter++;
     }
 
-    return OK;
+    if (Counter)
+        return OK;
+
+    return ERR_NO_MEMERY;
 }
 
 /*********************************************************************************************************************
@@ -1037,138 +1024,62 @@ STATUS mallocor_setup(void)
 *********************************************************************************************************************/
 void* malloc(INT32U Size)
 {
-    void            *pAppMemory;                                            /* Ó¦ÓÃÄÚ´æÇøÊ×Ö·                       */
-    INT32U           RemainSize;                                            /* ²Ð´æ¿Õ¼ä´óÐ¡                         */
     CHUNK           *pChunk;
-    CHUNK           *pNext;
-     
+
+
+    DBG_INFO("ÉêÇëÄÚ´æ¿Õ¼ä(size=%d)\r\n", Size);
+    
     semaphore_wait(&AccessLock, 0);
     Size = align_upside(Size + MIN_CHUNK_SIZE, sizeof(int));                /* ¸ñÊ½»¯ÉêÇë³ß´ç                       */
-    
-    if (Size <= 256) 
+    DBG_INFO("¶ÔÆëÄÚ´æ¿Õ¼ä(size=%d)\r\n", Size);
+
+    /*
+     * 1) ²éÕÒ×î¼Ñ¿Õ¼äÆ¥ÅäÄÚ´æ¿é,²¢ÄÚ´æ¹ÜÀíÆ÷ÖÐ·ÖÀë³öÀ´.
+     */
+    if (is_small(Size)) 
     {
         INT32U           Index;                                             /* ÄÚ´æÏäË÷ÒýºÅ                         */
         INT32U           SameBits;                                          /* Í¬ÐÍÄÚ´æÈÝÆ÷×é×´Ì¬Î»Í¼               */
+        CHUNK           *pHead;
        
         Size       = align_upside(Size, 8);
         Index      = get_box_index(Size);
         SameBits   = Mallocor.SameMap >> Index;                             /* È¥³ýÐ¡ÓÚ²»Âú×ãµÄË÷ÒýÎ»               */
-        
-        /* 
-         * 1) ÏÁÒå·ÖÅäÄÚ´æ¿Õ¼ä
-         *    ÔÚÁÚ½ü¿ÕÏÐÏäÖÐ·ÖÅäÄÚ´æµ¥Ôª
-         */
-        if (0 != (SameBits & 0x03))
+        Index = 0x1F & bit_scan_forward(SameBits << Index);
+        if (Index)
         {
-            CHUNK           *pHead;
-            
-            Index  = ~SameBits & 1ul;
-            pHead  = get_chunk(Index);                                      /* »ñÈ¡»·ÐÎÁ´±íÍ·½Úµã                   */
-            pChunk = pHead->pFreeNext;
-            unlink_first_small_chunk(pHead, pChunk, Index);
-            /* ÐÞ¸ÄÄÚ´æ¾µÏñ */
-            pNext = (CHUNK *)((char *)pChunk + Size);
-            pChunk->ThisInfo = pNext->PrevInfo = Size | USED;
-
-            pAppMemory = chunk_to_memeory(pChunk);
-            goto exit;
+            pHead  = get_same_chunk_group(Index);
+            pChunk = checkout_small_chunk_in_group(pHead, Index);
         }
-        
-        /*
-         * 2) ¾Ö²¿·ÖÅäÄÚ´æ¿Õ¼ä
-         *    ´Ó¿ìËÙ»º³åÇøÖÐ·ÖÅäÄÚ´æ¿Õ¼ä,ÒÔ´Ë±£Ö¤¾Ö²¿¾ÛºÏÐ§Ó¦.
-         */
-        if (Size <= Mallocor.SpareSize)
+        else
         {
-            goto quick;
+            pChunk = checkout_small_chunk_in_tree(Size);
         }
-
-        /*
-         * 3) ¹ãÒå·ÖÅäÄÚ´æ¿Õ¼ä
-         *    ´Ó¸ü´óµÄÍ¬ÀàÄÚ´æÏäÖÐ·ÖÅäÄÚ´æ¿é.
-         */
-        if (0 != SameBits)
-        {   
-            CHUNK           *pHead;
-            
-            SameBits <<= Index;
-            Index = bit_scan_forward(SameBits);
-            RemainSize = (Index << 3) - Size;
-            pHead = get_chunk(Index);
-            pChunk = pHead->pFreeNext;
-            unlink_first_small_chunk(pHead, pChunk, Index);
-
-            /* 
-             * ÓÉÓÚ´ÓµÚ1)²ã·ÖÅäµ½¹ãÒå·ÖÅä×îÉÙ¶à³ö8¸ö×Ö½Ú,¼´×îÉÙ¶à³öÒ»¸ö
-             * chunk¿Õ¼ä, ËùÒÔ´Ë´¦Ö±½Ó¶ÏÈ»½«chunkÒ»·ÖÎª¶þ 
-             */
-            pNext = (CHUNK *)((char *)pChunk + Size);
-            pChunk->ThisInfo = pNext->PrevInfo = Size | USED;
-            pNext->ThisInfo  = RemainSize | FREE;
-            update_temporary_chunk(pNext, RemainSize);
-
-            pAppMemory = chunk_to_memeory(pChunk);
-            goto exit;
-        }
-
-        /*
-         * 4) ÔÚÊ÷Ä¿Â¼½á¹¹ÖÐ·ÖÅäÐ¡¿éÄÚ´æ¿Õ¼ä 
-         */
-        pAppMemory = malloc_small_in_tree(Size);
-        goto exit;
-    }
-
-    /*
-     * 5) ÔÚÊ÷Ä¿Â¼½á¹¹ÖÐ·ÖÅä´ó¿éÄÚ´æ¿Õ¼ä
-     */
-    if (NULL != (pAppMemory = malloc_large_in_tree(Size)))
-    {
-        goto exit;
-    }
-    
-
-    if (Mallocor.SpareSize < Size)
-    {
-        goto exit;
-    }
-        
-    /*
-     * 2) ¾Ö²¿·ÖÅäÄÚ´æ¿Õ¼ä 
-     */    
-quick:
-    RemainSize = Mallocor.SpareSize - Size;
-    pChunk     = Mallocor.pRecent;
-    
-    if (RemainSize < MIN_CHUNK_SIZE)
-    {
-        /*
-         * µ±±»²Ã¼ôÊ£ÓàµÄÄÚ´æ²»×ãÒÔ´æ´¢×îÐ¡ÄÚ´æ¿éÊ±, ËùÐË°ÑËùÓÐµÄÄÚ´æ¿é
-         * ·ÖÅä³öÈ¥.
-         * ×¢Òâ: ÄÚ´æ¿é¿Õ¼ä³ß´çÊÇSpareSize.
-         */
-        pNext = (CHUNK *)((char *)pChunk + Mallocor.SpareSize);             /* ÏÂÒ»¸öÄÚ´æ¿é                         */
-        pChunk->ThisInfo = pNext->PrevInfo = Mallocor.SpareSize | USED;
-        Mallocor.SpareSize = 0;
-        Mallocor.pRecent = NULL;
     }
     else
     {
-        /*
-         * µ±±»²Ã¼ôÊ£ÓàµÄÄÚ´æ´óÓÚ´æ´¢×îÐ¡ÄÚ´æ¿éÊ±, ½«·ÖÅäÄ¿±ê³ß´çµÄÄÚ´æ¿é,²¢
-         * ½«²Ã¼ôÊ£ÓàµÄÄÚ´æ¿é±£´æÔÚ¿ìËÙ·ÖÅäÖÐ.
-         * ×¢Òâ: ÄÚ´æ¿é¿Õ¼ä³ß´çÊÇSize.
-         */
-        pNext = (CHUNK *)((char *)pChunk + Size);
-        pChunk->ThisInfo = pNext->PrevInfo = Size | USED;
-        Mallocor.pRecent = pNext;
-        Mallocor.SpareSize = RemainSize;
+        pChunk = checkout_large_chunk_in_tree(Size);
     }
-    
-    pAppMemory = chunk_to_memeory(pChunk);
-    
-exit:
+
+    /*
+     * 2) ³õÊ¼»¯ÉêÇëµ½µÄÄÚ´æ¿é,²¢½«Ê£ÓàÄÚ´æ¿é·µ»Ø¸øÄÚ´æ¹ÜÀíÆ÷.
+     *    pChunk: ÒÑÉêÇëµÄÄÚ´æ¿é;
+     *    Size  : ÉêÇë¿Õ¼ä´óÐ¡;
+     */
+    if (NULL != pChunk)
+    {
+        CHUNK               *pFreeChunk;
+
+        pFreeChunk = splite_free_chunk(pChunk, Size + sizeof(struct chunk_head));
+
+        checkin_free_chunk(pFreeChunk, pFreeChunk->ThisInfo);
+    }
     semaphore_post(&AccessLock);
-    return pAppMemory;
+    
+    DBG_INFO("ÄÚ´æ¿éÐÅÏ¢:\r\nPrevInfo  = 0x%X\r\nThisInfo  = 0x%X\r\npFreeNext = 0x%X\r\npFreePrev = 0x%X\r\n",
+             pChunk->PrevInfo, pChunk->ThisInfo, pChunk->pFreeNext, pChunk->pFreePrev);
+
+    return chunk_to_memeory(pChunk);
 }
 
 /*********************************************************************************************************************
@@ -1201,73 +1112,43 @@ void free(void * pMemory)
     
     semaphore_wait(&AccessLock, 0);                                         /* Ïß³Ì»¥³â±£»¤                         */
 
-    pThisChunk = (CHUNK *)((char *)pMemory - MIN_CHUNK_SIZE);
+    pThisChunk = (CHUNK *)((int)pMemory - sizeof(struct chunk_head));
     Size = pThisChunk->ThisInfo & ~1ul;
-    pNextChunk = (CHUNK *)((char *)pThisChunk + Size);
+    pNextChunk = (CHUNK *)((int)pThisChunk + Size);
 
     /*
-     * 1) ¶Ôprev¿é½øÐÐ´¦Àí
+     * 1) Èç¹ûprevÄÚ´æ¿éÎª¿ÕÏÐ×´Ì¬, Ôò½«prevÄÚ´æ¿éºÍthisÄÚ´æ¿éºÏ²¢.
      */
     if (FREE == test_bit(pThisChunk->PrevInfo, 0))                          /* ²âÊÔÉÏÒ»¿éÊÇ·ñ¿ÕÏÐ ?                 */
-    {   /* A) prev¿é¿ÕÏÐ×´Ì¬ */
+    {
         INT32U    PrevSize = pThisChunk->PrevInfo;                          /* prev¿é´óÐ¡                           */
 
-        pPrevChunk = (CHUNK *)((char *)pThisChunk - PrevSize);              /* prevÄÚ´æ¿é                           */
+        pPrevChunk = (CHUNK *)((int)pThisChunk - PrevSize);                 /* prevÄÚ´æ¿é                           */
         Size += PrevSize;
         pThisChunk = pPrevChunk;
 
-        if(pThisChunk != Mallocor.pRecent)
-        {
-            unlink_chunk(pThisChunk, PrevSize);
-        }
-        else
-        {
-            if(FREE != test_bit(pNextChunk->ThisInfo, 0))                   /* Èç¹ûprev¿é¾ÍÊÇdv¿é,ÇÒnext¿éÔÚÊ¹ÓÃÖÐ  */
-            {   
-                Mallocor.SpareSize = Size;
-                pThisChunk->ThisInfo = pPrevChunk->PrevInfo = Size;                
-            }
-        }
+        unlink_chunk(pPrevChunk, to_memory_size(PrevSize));
+
+        pThisChunk->ThisInfo = pNextChunk->PrevInfo = Size;                
     }
 
     /*
      * 2) ¶Ônext¿é½øÐÐ´¦Àí
      */
     if (FREE == test_bit(pNextChunk->ThisInfo, 0))                          /* ²âÊÔÏÂÒ»¿éÊÇ·ñ¿ÕÏÐ ?                 */
-    {   /* 2.A) next¿é´¦ÓÚ¿ÕÏÐ×´Ì¬ÏÂ */
-        if (pNextChunk == Mallocor.pRecent)
-        {
-            INT32U dsize = Mallocor.SpareSize += Size;
-            Mallocor.pRecent = pThisChunk;            
-            pNextChunk = (CHUNK *)((char *)pThisChunk + dsize);
-            pThisChunk->ThisInfo = pNextChunk->PrevInfo = dsize;
-            goto exit;
-        }
-        else
-        {
-            INT32U nsize = pNextChunk->ThisInfo;
-            Size += nsize;
-            unlink_chunk(pNextChunk, nsize);
-            pNextChunk = (CHUNK *)((char *)pNextChunk + nsize);
-            pThisChunk->ThisInfo = pNextChunk->PrevInfo = Size;
-            if (pThisChunk == Mallocor.pRecent)
-            {
-                Mallocor.SpareSize = Size;
-                goto exit;
-            }
-        }
-    }
-    else
-    {   /* 2.B) next¿é´¦ÓÚÕ¼ÓÃ×´Ì¬ÏÂ */
-        pThisChunk->ThisInfo = pNextChunk->PrevInfo = Size;
+    {
+        INT32U    NextSize = pNextChunk->ThisInfo;                          /* next¿é´óÐ¡                           */
+        CHUNK    *pNextNextChunk = (CHUNK *)((int)pNextChunk + NextSize);
+        
+        unlink_chunk(pNextChunk, to_memory_size(NextSize));
+        Size += NextSize;
+        pThisChunk->ThisInfo = pNextNextChunk->PrevInfo = Size;
     }
 
     /*
      * 3) ½«ÄÚ´æ¿é²åÈëÁÐ±í
      */
-    insert_chunk(pThisChunk, Size);
-    
-exit:
+    checkin_free_chunk(pThisChunk, Size);
     semaphore_post(&AccessLock);
 }
 

@@ -62,7 +62,7 @@ struct mailbox_t
     INT32U                           Size;                                  /* 消息邮箱大小                         */
     INT32U                           Read;                                  /* 读出数据索引                         */
     INT32U                           Write;                                 /* 写入数据索引                         */
-    THREAD                          *pThread;                               /* 邮件收取线程                         */
+    struct list_head                 WaitHead;                              /* 收取线程                             */
     enum mailbox_status              Status;                                /* 邮箱状态                             */
     MAIL                             Mail[1];                               /* 邮件空间                             */
 };

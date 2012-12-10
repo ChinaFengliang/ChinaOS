@@ -55,10 +55,7 @@
 /*********************************************************************************************************************
                                                   全局变量定义区
 *********************************************************************************************************************/
-extern INT32U        OS_InterruptNesting;                                   /* 中断嵌套计数器                       */
-extern INT32U        OS_ActivePrio;                                         /* 激活的优先级标志                     */
-extern THREAD       *OS_ActiveProc[33];                                     /* 激活的线程队列                       */
-extern THREAD       *OS_This;                                               /* 当前运行的线程                       */
+
 
 /*********************************************************************************************************************
 ** Function name:           mailbox_new
@@ -92,7 +89,7 @@ MAILBOX mailbox_new(INT32U Size)
         pMailbox->Size    = Size;
         pMailbox->Read    = 0;
         pMailbox->Write   = 0;
-        pMailbox->pThread = NULL;        
+        INIT_LIST_HEAD(&pMailbox->WaitHead);
     }
     
 exit:
@@ -159,8 +156,8 @@ int mailbox_create(MAILBOX Mailbox, INT32U Size)
     pMailbox->Size    = Size;
     pMailbox->Read    = 0;
     pMailbox->Write   = 0;
-    pMailbox->pThread = NULL;
     pMailbox->Status  = VALID;
+    INIT_LIST_HEAD(&pMailbox->WaitHead);
     
     return OK;
 }
@@ -190,6 +187,7 @@ int mail_fetch(MAILBOX Mailbox, MAIL *pMessage)
      * 从队列读出邮件(满递增的方式)
      */
     pMailbox = (struct mailbox_t *)Mailbox;
+    
     Key = atom_operate_lock();
     if (pMailbox->Read != pMailbox->Write)                                  /* 队列不为空                           */
     {
@@ -206,8 +204,8 @@ int mail_fetch(MAILBOX Mailbox, MAIL *pMessage)
         atom_operate_unlock(Key);
         return OK;
     }
-    
     atom_operate_unlock(Key);
+
     return ERR;
 }
 
@@ -269,42 +267,17 @@ int mail_wait(MAILBOX Mailbox, MAIL *pMessage, INT32U Timeout)
      */
     pThread = OS_This;
     Priority = pThread->Priority;
-    if (pThread == pThread->pNext)
-    {   /* 唯一节点 */
-        OS_ActiveProc[Priority] = NULL;
-        OS_ActivePrio &= ~(1ul << Priority);                                /* 清除就绪标志                         */
+    list_del(&pThread->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
+    {   
+        OS_ActivePrio &= ~(1ul << Priority);
     }
-    else
-    {   /* 非唯一节点 */
-        pThread->pPrev->pNext   = pThread->pNext;
-        pThread->pNext->pPrev   = pThread->pPrev;
-        OS_ActiveProc[Priority] = pThread->pNext;                           /* 更新线程组指针                       */
-    }
- 
+    
     /* 
      * 2) 添加唤醒条件
      */
+    list_add(&pThread->Node, &pMailbox->WaitHead);
     
-    /* 
-     * 2.1) 加入邮件等待队列
-     */
-    if (NULL == pMailbox->pThread)
-    {   /* 由0个节点增加到1个节点 */
-        pThread->pNext    = pThread;
-        pThread->pPrev    = pThread;
-        pMailbox->pThread = pThread;
-    }
-    else
-    {   /* 加在队列的后面 */
-        pThread->pPrev = pMailbox->pThread->pPrev;
-        pThread->pNext = pMailbox->pThread;
-        pMailbox->pThread->pPrev->pNext = pThread;
-        pMailbox->pThread->pPrev = pThread;
-    }
-    
-    /*
-     * 2.2) 设置超时唤醒条件
-     */
     if (Timeout)
     {
         OS_timer_add(&pThread->Timer, Timeout);                             /* 添加唤醒定时器                       */
@@ -331,17 +304,7 @@ int mail_wait(MAILBOX Mailbox, MAIL *pMessage, INT32U Timeout)
     /*
      * 4.2) 退出邮件等待队列
      */
-    if (pThread == pThread->pNext)
-    {
-        /* 当前线程为唯一等待线程时 */
-        pMailbox->pThread = NULL;
-    }
-    else
-    {
-        /* 本邮件存在多个等待线程时 */
-        pThread->pPrev->pNext = pThread->pNext;
-        pThread->pNext->pPrev = pThread->pPrev;
-    }
+    list_del(&pThread->Node);
     
     /*
      * 5) 收取邮件
@@ -358,7 +321,7 @@ int mail_wait(MAILBOX Mailbox, MAIL *pMessage, INT32U Timeout)
     else
     {
         pMailbox->Read++;
-    }        
+    }
     *pMessage = pMailbox->Mail[pMailbox->Read];
     atom_operate_unlock(Key);   
     
@@ -415,7 +378,7 @@ int mail_post(MAILBOX Mailbox, MAIL Message)
     pMailbox->Write       = Index;
     pMailbox->Mail[Index] = Message;
 
-    if (NULL == (Thread = pMailbox->pThread))                               /* 没有线程等待                         */
+    if (list_empty(&pMailbox->WaitHead))
     {
         goto exit;
     }
@@ -423,23 +386,12 @@ int mail_post(MAILBOX Mailbox, MAIL Message)
     /* 
      * 2) 线程就绪
      *    将线程控制表插入到指定线程队列.
-     */    
+     */
+    Thread = container_of(&pMailbox->WaitHead.next->next, THREAD, Node);
     Priority = Thread->Priority;     
     Key = atom_operate_lock();
-    if (NULL == OS_ActiveProc[Priority])
-    {   /* 由0个节点增加到1个节点 */
-        Thread->pNext = Thread;
-        Thread->pPrev = Thread;
-        OS_ActiveProc[Priority] = Thread;
-        OS_ActivePrio |= 1ul << Priority;                                   /* 设置优先级就绪标志                   */    
-    }
-    else
-    {   /* 加在队列的后面 */
-        Thread->pPrev = OS_ActiveProc[Priority]->pPrev;
-        Thread->pNext = OS_ActiveProc[Priority];
-        OS_ActiveProc[Priority]->pPrev->pNext = Thread;
-        OS_ActiveProc[Priority]->pPrev = Thread;
-    }
+    list_add(&Thread->Node, &OS_ActiveProc[Priority]);
+    OS_ActivePrio |= 1ul << Priority;
     atom_operate_unlock(Key);
 
     /* 

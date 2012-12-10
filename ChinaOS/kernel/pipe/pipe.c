@@ -10,7 +10,7 @@
 ** Last version:         V1.00
 ** Descriptions:         阻塞管道文件.
 ** Hardware platform:    
-** SoftWare platform:	 ChinaOS
+** SoftWare platform:    ChinaOS
 **
 **--------------------------------------------------------------------------------------------------------------------
 ** Created by:           FengLiang
@@ -55,15 +55,12 @@ struct pipe_t
     INT32U         Width;                                                   /* 管道宽度 number of bytes per element */
     INT32U         In;                                                      /* 输入索引                             */    
     INT32U         Out;                                                     /* 输出索引 data is extracted from off. */
-    THREAD        *pThread;                                                 /* 管道接收端线程                       */
+    THREAD        *pReadThread;                                             /* 管道接收端线程                       */
 };  
 
 /*********************************************************************************************************************
                                                   全局变量定义区
 *********************************************************************************************************************/
-extern INT32U        OS_ActivePrio;                                         /* 激活的优先级标志                     */
-extern THREAD       *OS_ActiveProc[33];                                     /* 激活的线程队列                       */
-extern THREAD       *OS_This;                                               /* 当前运行的线程                       */
 
 
 /*********************************************************************************************************************
@@ -93,7 +90,7 @@ void * pipe_new(unsigned int Width, unsigned int Length)
         return NULL;
     }
     
-    /*   
+    /*
      * round up to the next power of 2, since our 'let the indices   
      * wrap' tachnique works only in this case.   
      */    
@@ -105,14 +102,14 @@ void * pipe_new(unsigned int Width, unsigned int Length)
     pPipe = (struct pipe_t *)malloc(Length * Width + sizeof(struct pipe_t));    
     if (NULL != pPipe)    
     {
-        pPipe->pThread = NULL;
+        pPipe->pReadThread = NULL;
         pPipe->Lenth   = Length;
         pPipe->Width   = Width;
         pPipe->In      = pPipe->Out = 0;
         pPipe->pBuffer = (unsigned char *)pPipe + sizeof(struct pipe_t);
     }
 
-    return (void *) pPipe;
+    return (void *)pPipe;
 }  
 
 /*********************************************************************************************************************
@@ -148,7 +145,7 @@ void pipe_free(void * Pipe)
 ** Created Date:            2011-5-23  19:53:22
 ** Test recorde:            
 **--------------------------------------------------------------------------------------------------------------------
-** Modified by:
+** Modified by:             当pipe已经满时，写入会不会覆盖
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
@@ -194,31 +191,19 @@ int pipe_write(void * Pipe, void * pElements, unsigned Length)
   
     pPipe->In += Length;
 
-    if (NULL == (Thread = pPipe->pThread))                                  /* 没有线程等待                         */
+    if (NULL == (Thread = pPipe->pReadThread))                              /* 没有线程等待                         */
     {
         goto exit;
     }
 
     /* 
      * 2) 线程就绪
-     *    将线程控制表插入到指定线程队列.
+     *    将管道等待队列中线程控制表插入到指定线程队列.
      */    
     Priority = Thread->Priority;     
     Key = atom_operate_lock();
-    if (NULL == OS_ActiveProc[Priority])
-    {   /* 由0个节点增加到1个节点 */
-        Thread->pNext = Thread;
-        Thread->pPrev = Thread;
-        OS_ActiveProc[Priority] = Thread;
-        OS_ActivePrio |= 1ul << Priority;                                   /* 设置优先级就绪标志                   */    
-    }
-    else
-    {   /* 加在队列的后面 */
-        Thread->pPrev = OS_ActiveProc[Priority]->pPrev;
-        Thread->pNext = OS_ActiveProc[Priority];
-        OS_ActiveProc[Priority]->pPrev->pNext = Thread;
-        OS_ActiveProc[Priority]->pPrev = Thread;
-    }
+    list_add(&Thread->Node, &OS_ActiveProc[Priority]);
+    OS_ActivePrio |= 1ul << Priority;
     atom_operate_unlock(Key);
 
     /* 
@@ -288,22 +273,16 @@ int pipe_read(void * Pipe, void * pElements, unsigned Length, int Timeout)
     }
     
     pThread = OS_This;
-    pPipe->pThread = pThread;
+    pPipe->pReadThread = pThread;
     
     /* 
      * 1) 将当前线程挂起
      */
     Priority = pThread->Priority;
-    if (pThread == pThread->pNext)
-    {   /* 唯一节点 */
-        OS_ActiveProc[Priority] = NULL;
-        OS_ActivePrio &= ~(1ul << Priority);                                /* 清除就绪标志                         */
-    }
-    else
-    {   /* 非唯一节点 */
-        pThread->pPrev->pNext   = pThread->pNext;
-        pThread->pNext->pPrev   = pThread->pPrev;
-        OS_ActiveProc[Priority] = pThread->pNext;                           /* 更新线程组指针                       */
+    list_del(&pThread->Node);
+    if (list_empty(&OS_ActiveProc[Priority]))
+    {   
+        OS_ActivePrio &= ~(1ul << Priority);
     }
 
     /*
@@ -328,8 +307,7 @@ int pipe_read(void * Pipe, void * pElements, unsigned Length, int Timeout)
     {
         OS_timer_del(&pThread->Timer);                                      /* 删除唤醒定时器                       */    
     }
- 
-    pPipe->pThread = NULL;
+    pPipe->pReadThread = NULL;
     
     /*
      * 5) 从管道缓存区读出数据(满递增的方式)

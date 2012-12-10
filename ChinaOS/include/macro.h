@@ -194,7 +194,7 @@ static INLINE unsigned char toupper(unsigned char c)
 #define SECTION(Name)               __attribute__((section(Name)))
 //#define SECTION(Name)               __attribute__(used, (section(Name)))
 /*********************************************************************************************************************
-** Function name:           EXPORT_TO_CONSOLE
+** Function name:           EXPORT_TO_COMMAND
 ** Descriptions:            导出函数到命令列表
 ** Input parameters:        Description: 功能描述
 **                          Function   : 功能函数
@@ -209,7 +209,7 @@ static INLINE unsigned char toupper(unsigned char c)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-#define EXPORT_TO_CONSOLE(Description, Function)                           \
+#define EXPORT_TO_COMMAND(Description, Function)                           \
         const SERVICE Service##Function SECTION("aConsoleServices")=       \
         {                                                                  \
             #Function,                                                     \
@@ -229,7 +229,7 @@ static INLINE unsigned char toupper(unsigned char c)
 ** Created Date:            2012-6-18  20:51:28
 ** Test recorde:            
 **--------------------------------------------------------------------------------------------------------------------
-** Modified by:
+** Modified by:             /device
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/

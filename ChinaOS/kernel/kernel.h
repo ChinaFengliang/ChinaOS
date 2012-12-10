@@ -36,6 +36,7 @@ extern "C" {
 #include    <include/macro.h>
 #include    <include/types.h>
 #include    <ticker/ticker.h>
+#include    <library/link/list.h>
 
 /*********************************************************************************************************************
                                                     ºê¶¨ÒåÇø
@@ -55,20 +56,10 @@ struct __thread_t
     const char         *pName;                                              /* Ïß³ÌÃû³Æ                             */
     struct __thread_t  *pLive;                                              /* ¼¤»îÏß³ÌÁ´±í                         */
     
-#if 0
-    INT32U              Status;                                             /* Ïß³Ì×´Ì¬                             */
-    INT32U              TimesliceEn;                                        /* Ïß³ÌÊ±¼äÆ¬Ê¹ÄÜ                       */
-#endif
-
-    /* Ïß³Ì¶¨Ê±Æ÷
-     * 1¡¢µ±Ç°Ïß³ÌÎªÔËÐÐ×´Ì¬Ê±, ´Ë¶¨Ê±Æ÷Îª³¬Ê±¶¨Ê±Æ÷;
-     * 2¡¢µ±Ç°Ïß³ÌÎªË¯Ãß×´Ì¬Ê±, ´Ë¶¨Ê±Æ÷Îª»½ÐÑ¶¨Ê±Æ÷;
-     */
     TIMER               Timer;                                              /* Ïß³Ì¶¨Ê±Æ÷                           */
-    struct __thread_t  *pNext;                                              /* ÏÂÒ»Ïß³Ì¿ØÖÆ±í                       */
-    struct __thread_t  *pPrev;                                              /* ÉÏÒ»Ïß³Ì¿ØÖÆ±í                       */
-    void               *pAttachment;                                        /* attachment point                     */
+    struct list_head    Node;
 
+    void               *pAttachment;                                        /* ¶îÍâÊý¾Ý¹ÒÔØµã                       */
     void               (*pExit)(INT32S);                                    /* Ïß³ÌÍË³ö»Øµ÷º¯Êý                     */
     void               (*pKill)(void);                                      /* Ïß³ÌÉ±ËÀ»Øµ÷º¯Êý                     */
 };
@@ -77,8 +68,10 @@ typedef struct __thread_t               THREAD;                             /* Ï
 /*********************************************************************************************************************
                                                   È«¾Ö±äÁ¿¶¨ÒåÇø
 *********************************************************************************************************************/
-extern THREAD     *OS_LiveList;                                             /* ¼¤»îÏß³ÌÁ´±í                         */
-extern THREAD     *OS_This;                                                 /* µ±Ç°ÔËÐÐµÄÏß³Ì                       */
+extern THREAD              *OS_LiveList;                                    /* ¼¤»îÏß³ÌÁ´±í                         */
+extern INT32U               OS_ActivePrio;                                  /* ¼¤»îµÄÓÅÏÈ¼¶±êÖ¾                     */
+extern struct list_head     OS_ActiveProc[33];                              /* ¼¤»îµÄÏß³Ì¶ÓÁÐ                       */
+extern THREAD              *OS_This;                                        /* µ±Ç°Ïß³Ì                             */
 
 /*********************************************************************************************************************
 ** Function name:           labour
