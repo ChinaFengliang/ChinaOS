@@ -70,15 +70,12 @@ ARM Macro Assembler    Page 2
 
 
                        -----*/
-   36 00000000                 IMPORT           OS_This     ;pThreadThis       
+   36 00000000                 IMPORT           OS_This     ;/* µ±Ç°ÔËÐÐµÄÏß³Ì 
                                                                                
+                                                               */
+   37 00000000                 IMPORT           shift       ;/* Ïß³Ì½»Ìæ       
                                                                                
-                                                                ;/* µ±Ç°ÔËÐÐµÄÏ
-                                                            ß³Ì                
-                                                                   */
-   37 00000000                 IMPORT           shift_thread ;/* Ïß³Ì½»Ìæ      
-                                                                               
-                                                                */
+                                                               */
    38 00000000         
    39 00000000         ;/******************************************************
                        ********************************************************
@@ -128,15 +125,15 @@ ARM Macro Assembler    Page 2
    66 0000000E         
    67 0000000E         ;/* ´ËÊ±R3±£´æÕ»¶¥Ö¸Õë */
    68 0000000E         
+   69 0000000E         ;/* ÓÉÓÚÓ²¼þ×Ô¶¯½«R0~R3Ñ¹ÈëÕ»,ËùÒÔ²ÎÊýÓ¦¸Ã´ÓÕ»ÀïÈ¡³ö */
+   70 0000000E 6818            LDR              R0,  [R3]   ;/* ¶ÁÈ¡µØÖ·R0±äÁ¿µ
+                                                            ÄÖµ       */  
 
 
 
 ARM Macro Assembler    Page 3 
 
 
-   69 0000000E         ;/* ÓÉÓÚÓ²¼þ×Ô¶¯½«R0~R3Ñ¹ÈëÕ»,ËùÒÔ²ÎÊýÓ¦¸Ã´ÓÕ»ÀïÈ¡³ö */
-   70 0000000E 6818            LDR              R0,  [R3]   ;/* ¶ÁÈ¡µØÖ·R0±äÁ¿µ
-                                                            ÄÖµ       */  
    71 00000010 6859            LDR              R1,     [R3, #4] ;/* ¶ÁÈ¡µØÖ·R1
                                                             ±äÁ¿µÄÖµ       */
    72 00000012         
@@ -193,15 +190,15 @@ static_service_table)/2)
    93 00000028         ;** Created Date:            2010-9-2  9:19:42
    94 00000028         ;** Test recorde:
    95 00000028         ;**-----------------------------------------------------
+                       --------------------------------------------------------
+                       -------
+   96 00000028         ;** Modified by:
 
 
 
 ARM Macro Assembler    Page 4 
 
 
-                       --------------------------------------------------------
-                       -------
-   96 00000028         ;** Modified by:
    97 00000028         ;** Modified date:
    98 00000028         ;** Test recorde:
    99 00000028         ;*******************************************************
@@ -258,15 +255,15 @@ ARM Macro Assembler    Page 4
   128 0000003E         
   129 0000003E         ;/******************************************************
                        ********************************************************
+                       *******
+  130 0000003E         ;** Function name:          void static_activate_system(
+                       void)
 
 
 
 ARM Macro Assembler    Page 5 
 
 
-                       *******
-  130 0000003E         ;** Function name:          void static_activate_system(
-                       void)
   131 0000003E         ;** Descriptions:           ¼¤»î²Ù×÷ÏµÍ³
   132 0000003E         ;** Input parameters:       
   133 0000003E         ;** Output parameters:      
@@ -299,7 +296,7 @@ ARM Macro Assembler    Page 5
   154 0000004A 6800            LDR              R0, [R0]
   155 0000004C         
   156 0000004C         update_thread
-  157 0000004C F7FF FFFE       BL               shift_thread
+  157 0000004C F7FF FFFE       BL               shift
   158 00000050         ;/******************************************************
                        ********************************************************
                        *******
@@ -323,15 +320,15 @@ ARM Macro Assembler    Page 5
   169 00000050         ;** Modified by:
   170 00000050         ;** Modified date:
   171 00000050         ;** Test recorde:
+  172 00000050         ;*******************************************************
+                       ********************************************************
+                       ******/
 
 
 
 ARM Macro Assembler    Page 6 
 
 
-  172 00000050         ;*******************************************************
-                       ********************************************************
-                       ******/
   173 00000050         regist_recover
   174 00000050         ;/* Òì³£·µ»ØÏß³ÌÄ£Ê½,²¢Ê¹ÓÃÏß³Ì¶ÑÕ»PSP¼Ä´æÆ÷ */
   175 00000050 F06F 0E02       MOV              LR,  #0xFFFFFFFD
@@ -388,15 +385,15 @@ ARM Macro Assembler    Page 6
   205 00000066         ;** Descriptions:            Ô­×Ó²Ù×÷½áÊø
   206 00000066         ;** Input parameters:        R0: ÖÐ¶Ï×´Ì¬¿ØÖÆ×Ö
   207 00000066         ;** Output parameters:       
+  208 00000066         ;** Returned value:          
+  209 00000066         ;**-----------------------------------------------------
+                       --------------------------------------------------------
 
 
 
 ARM Macro Assembler    Page 7 
 
 
-  208 00000066         ;** Returned value:          
-  209 00000066         ;**-----------------------------------------------------
-                       --------------------------------------------------------
                        -------
   210 00000066         ;** Created by:              Fengliang
   211 00000066         ;** Created Date:            2010-8-26  17:33:13
@@ -453,15 +450,15 @@ ARM Macro Assembler    Page 7
                                                                                
                                                                */
               E000ED04 
+              00000000 
+Command Line: --debug --xref --cpu=Cortex-M3 --apcs=interwork --depend=.\output
+\debug\syscall.d -o.\output\debug\syscall.o -IC:\Keil\ARM\INC -IC:\Keil\ARM\INC
 
 
 
 ARM Macro Assembler    Page 8 
 
 
-              00000000 
-Command Line: --debug --xref --cpu=Cortex-M3 --apcs=interwork --depend=.\output
-\debug\syscall.d -o.\output\debug\syscall.o -IC:\Keil\ARM\INC -IC:\Keil\ARM\INC
 \NXP\LPC17xx --list=.\syscall.lst ..\..\ChinaOS\architecture\arm\cortex-m3\sysc
 all.s
 
@@ -600,13 +597,13 @@ Symbol: OS_This
    Uses
       At line 152 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
 Comment: OS_This used once
-shift_thread 00000000
+shift 00000000
 
-Symbol: shift_thread
+Symbol: shift
    Definitions
       At line 37 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
    Uses
       At line 157 in file ..\..\ChinaOS\architecture\arm\cortex-m3\syscall.s
-Comment: shift_thread used once
+Comment: shift used once
 2 symbols
 340 symbols in table

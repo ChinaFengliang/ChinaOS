@@ -43,13 +43,12 @@ typedef           int               STATUS;                                 /*  
 typedef  unsigned long              REGISTER;                               /*  寄存器类型                          */
 
 /* 服务类型 --------------------------------------------------------------------------------------------------------*/
-struct __console_service
+struct command_t
 {
-    char     *pName;                                                        /* 服务名称                             */
-    char     *pDescription;                                                 /* 服务描述                             */
-    int     (*pFunction)(char *Option);                                     /* 服务函数                             */
+    char     *pName;                                                        /* 命令名称                             */
+    char     *pDescription;                                                 /* 命令描述                             */
+    int     (*pFunction)(char *Option);                                     /* 命令函数                             */
 };
-typedef struct __console_service    SERVICE;                                /* 服务类型                             */
 
 /* 设备类型 --------------------------------------------------------------------------------------------------------*/
 struct device_t

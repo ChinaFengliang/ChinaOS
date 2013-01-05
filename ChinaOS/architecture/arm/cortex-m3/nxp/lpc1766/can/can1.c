@@ -188,7 +188,7 @@ const CLASS_CAN          can1 =                                               /*
     can1_send,
     can1_recv
 };
-EXPORT_TO_DEVICE(can1, "CAN总线1");
+EXPORT_DEVICE(can1, "CAN总线1");
 
 /*********************************************************************************************************************
                                                     END OF FILE

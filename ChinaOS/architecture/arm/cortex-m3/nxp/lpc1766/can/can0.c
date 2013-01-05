@@ -174,7 +174,7 @@ const CLASS_CAN        can0 =                                               /* É
     can0_send,
     can0_recv
 };
-EXPORT_TO_DEVICE(can0, "CAN×ÜÏß0");
+EXPORT_DEVICE(can0, "CAN×ÜÏß0");
 
 /*********************************************************************************************************************
                                                     END OF FILE

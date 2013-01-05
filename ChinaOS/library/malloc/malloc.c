@@ -25,7 +25,7 @@
 ** Descriptions:
 **
 *********************************************************************************************************************/
-#define DEBUG_LOCAL_EN                              1                       /* ±¾µØµ÷ÊÔ¿ª¹Ø(Ä¬ÈÏÅäÖÃ): 0:¹Ø; 1:¿ª   */
+#define DEBUG_LOCAL_EN                              0                       /* ±¾µØµ÷ÊÔ¿ª¹Ø(Ä¬ÈÏÅäÖÃ): 0:¹Ø; 1:¿ª   */
 /*********************************************************************************************************************
                                                     Í·ÎÄ¼þÇø
 *********************************************************************************************************************/
@@ -91,27 +91,69 @@
  |
  */
 
+/*
+
+            msb                                                                                         lsb
+           +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    Î»  Í¼ |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+           |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+           +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+
+    Î»Ë÷Òý: 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00         
+
+             |                                                                                            |
+             |                                                                                            |
+       chunk_head + 256                                                                            chunk_head + 8  
+
+
+            msb                                                                                         lsb
+           +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    Î»  Í¼ |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+           |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+           +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+    
+    Î»Ë÷Òý: 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00         
+    
+             |                                                                                            |
+             |                                                                                            |
+       chunk_head + [12582912,ÎÞÏÞ´ó)                                                          chunk_head + [256, 384)  
+
+                                                    +--+
+                                                    |  |
+                                                    |  |
+                                                    +--+
+                                                     |
+                                                     a
+                                                     |\
+                                                     | \
+                                                     |  \
+                                                     b   c
+                                                     |\   \
+                                                     | \   \
+                                                     |  \   \
+                                                     d   e   f <=> h <=> i
+                                                      \    
+                                                       \   
+                                                        \  
+                                                         g
+
+
+                                                                                                                    */
 /*********************************************************************************************************************
                                                     ºê¶¨ÒåÇø
 *********************************************************************************************************************/
 /* ºê¶ÎÃû ----------------------------------------------------------------------------------------------------------*/
-#define FREE                            0ul                                 /* ¿ÕÏÐ                                 */
-#define USED                            1ul                                 /* Õ¼ÓÃ                                 */
 #define MIN_CHUNK_SIZE                  sizeof(CHUNK)                       /* ×îÐ¡¿É·ÖÅäÄÚ´æ¿é´óÐ¡                 */
 
 /* mask with all bits to left of least bit of x on */
 #define left_bits(x)                    ((x<<1) | -(x<<1))
 #define to_memory_size(ChunkSize)       ((ChunkSize) - sizeof(struct chunk_head))
+#define to_chunk_size(Size)             ((Size) + sizeof(struct chunk_head))
 
 /*********************************************************************************************************************
                                                     ÀàÐÍ¶¨ÒåÇø
 *********************************************************************************************************************/
-/* Õ¼ÓÃÄÚ´æ¿éÕªÒªÀàÐÍ ----------------------------------------------------------------------------------------------*/
-struct chunk_head
-{
-    INT32U              PrevInfo;                                           /* Ç°¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
-    INT32U              ThisInfo;                                           /* ±¾¿é¿Õ¼äÐÅÏ¢(¿é´óÐ¡ + ×´Ì¬)          */
-};
+
 
 /* ¿ÕÏÐÄÚ´æ¿éÕªÒªÀàÐÍ ----------------------------------------------------------------------------------------------*/
 struct __chunk
@@ -153,7 +195,7 @@ typedef struct __memory_allocor                     MALLOCOR;               /* Ä
                                                   È«¾Ö±äÁ¿¶¨ÒåÇø
 *********************************************************************************************************************/
 static MALLOCOR             Mallocor;                                       /* ÄÚ´æ·ÖÅäÆ÷                           */
-static struct semaphore     AccessLock;                                     /* ·ÃÎÊËø                               */
+static struct semaphore     Lock;                                     /* ·ÃÎÊËø                               */
 
 /*********************************************************************************************************************
 ** Function name:           get_same_chunk_group
@@ -447,7 +489,7 @@ INLINE void insert_large_chunk(TNODE *pChunk, INT32U Size)
     }
 
     /*
-     * B)·Ç¿ÕÊ÷
+     * B) ·Ç¿ÕÊ÷
      */
     BitMap = Size << leftshift_for_tree_index(Index);
     ChunkSize = Size + 8;
@@ -622,6 +664,11 @@ INLINE void unlink_large_chunk(TNODE* pChunk)
     TNODE               *pParent;
     TNODE               *pReplace;                                          /* Ìæ´ú½Úµã                             */
 
+
+    if (NULL == pChunk)
+    {
+        return;
+    }
     
     if (pChunk->pFreePrev != pChunk)
     {
@@ -770,7 +817,7 @@ INLINE CHUNK * checkout_small_chunk_in_group(CHUNK *pHead, INT32U Index)
 
 /*********************************************************************************************************************
 ** Function name:           checkout_small_chunk_in_tree
-** Descriptions:            Ñ°ÕÒÊ÷Ä¿Â¼ÖÐ×îÐ¡µÄ½Úµã
+** Descriptions:            Ñ°ÕÒÊ÷Ä¿Â¼ÖÐ×îÐ¡µÄ½Úµã,²¢½«Æä´ÓÊ÷½á¹¹ÖÐ½âÏÂ.
 ** Input parameters:        Size : ¿Õ¼ä´óÐ¡(µ¥Î»: Byte)
 ** Output parameters:       
 ** Returned value:          == NULL : ÉêÇëÊ§°Ü
@@ -828,7 +875,7 @@ static CHUNK* checkout_small_chunk_in_tree(INT32U Size)
 ** Input parameters:        Size : ¿Õ¼ä´óÐ¡(µ¥Î»: Byte)
 ** Output parameters:       
 ** Returned value:          ==NULL : ²Ù×÷Ê§°Ü
-**                          !=NULL : ²Ù×÷³É¹¦(ÄÚ´æ¿Õ¼äµØÖ·)
+**                          !=NULL : ²Ù×÷³É¹¦
 **--------------------------------------------------------------------------------------------------------------------
 ** Created by:              Fengliang
 ** Created Date:            2011-3-20  18:51:29
@@ -840,22 +887,27 @@ static CHUNK* checkout_small_chunk_in_tree(INT32U Size)
 *********************************************************************************************************************/
 static CHUNK * checkout_large_chunk_in_tree(INT32U Size) 
 {
-    INT32U       rsize = -Size;                                             /* ×îÐ¡²î¾à                             */
+    INT32U       rsize;                                                     /* ×îÐ¡²î¾à                             */
     TNODE       *pChunk = NULL;                                             /* ×î¼Ñ¿é                               */
     TNODE       *pTree;
     INT32U       idx;
-
+    INT32U       ChunkSize;
+    
 
     idx = tree_size_to_index(Size);
-    if (NULL != (pTree = Mallocor.pTreeChunks[idx]))
+    pTree = Mallocor.pTreeChunks[idx];
+    ChunkSize = to_chunk_size(Size);
+    rsize = -ChunkSize;                                                     /*ÎÞ·ûºÅÕûÀí¹æÔò: (Ð¡-n) > (´ó-n)      */
+    
+    if (NULL != pTree)
     {
         INT32U sizebits = Size << leftshift_for_tree_index(idx);
-        TNODE  *rst = NULL;
+        TNODE  *pBigTree = NULL;
 
         while(1)
         {
-            TNODE   *rt;
-            INT32U   trem = get_chunk_size(pTree) - Size;                   /* ±¾´Î²î¾à                             */
+            TNODE   *pRightTree;
+            INT32U   trem = get_chunk_size(pTree) - ChunkSize;              /* ±¾´Î²î¾à                             */
             
             if (trem < rsize)
             {
@@ -866,17 +918,17 @@ static CHUNK * checkout_large_chunk_in_tree(INT32U Size)
                 }
             }
             
-            rt = pTree->pChild[1];
+            pRightTree = pTree->pChild[1];
             pTree  = pTree->pChild[(sizebits >> 31) & 1ul];
             
-            if (rt != NULL && rt != pTree)
+            if (pRightTree != NULL && pRightTree != pTree)
             {
-                rst = rt;
+                pBigTree = pRightTree;
             }
             
             if (NULL == pTree)
             {
-                pTree = rst;
+                pTree = pBigTree;
                 break;
             }
             
@@ -890,10 +942,15 @@ static CHUNK * checkout_large_chunk_in_tree(INT32U Size)
     if (NULL == pTree && NULL == pChunk)
     {   
         INT32U leftbits = Mallocor.TreeMap & left_bits(1ul << idx);
+        
         if (leftbits != 0)
         {
             INT32U Index;
             Index = bit_scan_forward(leftbits);
+            if (32 == Index)
+            {
+                return NULL;
+            }
             pTree = Mallocor.pTreeChunks[Index];
         }
     }
@@ -903,7 +960,7 @@ static CHUNK * checkout_large_chunk_in_tree(INT32U Size)
      */
     while (NULL != pTree)                                                       
     {   
-        INT32U trem = get_chunk_size(pTree) - Size;
+        INT32U trem = get_chunk_size(pTree) - ChunkSize;
         if (trem < rsize)
         {
             rsize = trem;
@@ -913,6 +970,7 @@ static CHUNK * checkout_large_chunk_in_tree(INT32U Size)
     }
 
     unlink_large_chunk(pChunk);
+    
     return (CHUNK *)pChunk; 
 }
     
@@ -932,7 +990,7 @@ static CHUNK * checkout_large_chunk_in_tree(INT32U Size)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-STATUS mallocor_setup(void)
+int mallocor_setup(void)
 {
     int             i;
     int             Counter;
@@ -940,8 +998,8 @@ STATUS mallocor_setup(void)
     /*
      * 1) ´´½¨¹ÜÀí·ÃÎÊËø
      */
-    AccessLock.Counter = 1;
-    INIT_LIST_HEAD(&AccessLock.WaitHead);
+    Lock.Counter = 1;
+    INIT_LIST_HEAD(&Lock.WaitHead);
     
     /*
      * 2) ³õÊ¼»¯ÄÚ´æÈÝÆ÷×é
@@ -957,14 +1015,14 @@ STATUS mallocor_setup(void)
     /*
      * 3) ×¢²áËùÓÐÄÚ´æ³Ø
      */
-    for (Counter = i = 0; i < NumOfHeap; i++)
+    for (Counter = i = 0; i < ARRAY_SIZE(aRamBanks); i++)
     {
         INT32U      StartAddr;                                              /* ÓÐÐ§¿Õ¼äÆðÊ¼µØÖ·                     */
         INT32U      EndAddr;                                                /* ÓÐÐ§¿Õ¼ä½áÊøµØÖ·                     */
         INT32U      ChunkSize;                                              /* chunk¿Õ¼ä´óÐ¡                        */
         
-        StartAddr = (INT32U)aMemorySegments[i].pStartAddr;
-        EndAddr   = (INT32U)aMemorySegments[i].pEndAddr;             
+        StartAddr = aRamBanks[i].StartAddr;
+        EndAddr   = aRamBanks[i].EndAddr;             
 
         /* ¶ÔÆëµ½ARMÏµÍ³×Ö¶ÔÆë¸ñÊ½ */
         StartAddr = align_upside(StartAddr, sizeof(INT32U));
@@ -1029,7 +1087,7 @@ void* malloc(INT32U Size)
 
     DBG_INFO("ÉêÇëÄÚ´æ¿Õ¼ä(size=%d)\r\n", Size);
     
-    semaphore_wait(&AccessLock, 0);
+    semaphore_wait(&Lock, 0);
     Size = align_upside(Size + MIN_CHUNK_SIZE, sizeof(int));                /* ¸ñÊ½»¯ÉêÇë³ß´ç                       */
     DBG_INFO("¶ÔÆëÄÚ´æ¿Õ¼ä(size=%d)\r\n", Size);
 
@@ -1062,7 +1120,7 @@ void* malloc(INT32U Size)
     }
 
     /*
-     * 2) ³õÊ¼»¯ÉêÇëµ½µÄÄÚ´æ¿é,²¢½«Ê£ÓàÄÚ´æ¿é·µ»Ø¸øÄÚ´æ¹ÜÀíÆ÷.
+     * 2) ³õÊ¼»¯ÉêÇëÄÚ´æ¿é,²¢½«Ê£ÓàÄÚ´æ¿é·µ»Ø¸øÄÚ´æ¹ÜÀíÆ÷.
      *    pChunk: ÒÑÉêÇëµÄÄÚ´æ¿é;
      *    Size  : ÉêÇë¿Õ¼ä´óÐ¡;
      */
@@ -1074,10 +1132,13 @@ void* malloc(INT32U Size)
 
         checkin_free_chunk(pFreeChunk, pFreeChunk->ThisInfo);
     }
-    semaphore_post(&AccessLock);
+
+    semaphore_post(&Lock);
     
-    DBG_INFO("ÄÚ´æ¿éÐÅÏ¢:\r\nPrevInfo  = 0x%X\r\nThisInfo  = 0x%X\r\npFreeNext = 0x%X\r\npFreePrev = 0x%X\r\n",
-             pChunk->PrevInfo, pChunk->ThisInfo, pChunk->pFreeNext, pChunk->pFreePrev);
+    DBG_INFO("ÄÚ´æ¿éÐÅÏ¢:\r\n"
+             "PrevInfo = 0x%X\r\n"
+             "ThisInfo = 0x%X\r\n",
+             pChunk->PrevInfo, pChunk->ThisInfo);
 
     return chunk_to_memeory(pChunk);
 }
@@ -1110,11 +1171,12 @@ void free(void * pMemory)
         return;
     }
     
-    semaphore_wait(&AccessLock, 0);                                         /* Ïß³Ì»¥³â±£»¤                         */
+    semaphore_wait(&Lock, 0);                                         /* Ïß³Ì»¥³â±£»¤                         */
 
     pThisChunk = (CHUNK *)((int)pMemory - sizeof(struct chunk_head));
     Size = pThisChunk->ThisInfo & ~1ul;
     pNextChunk = (CHUNK *)((int)pThisChunk + Size);
+    pThisChunk->ThisInfo = pNextChunk->PrevInfo = Size;
 
     /*
      * 1) Èç¹ûprevÄÚ´æ¿éÎª¿ÕÏÐ×´Ì¬, Ôò½«prevÄÚ´æ¿éºÍthisÄÚ´æ¿éºÏ²¢.
@@ -1149,7 +1211,8 @@ void free(void * pMemory)
      * 3) ½«ÄÚ´æ¿é²åÈëÁÐ±í
      */
     checkin_free_chunk(pThisChunk, Size);
-    semaphore_post(&AccessLock);
+    
+    semaphore_post(&Lock);
 }
 
 /*********************************************************************************************************************

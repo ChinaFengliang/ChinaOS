@@ -87,7 +87,7 @@ int version(char *Option)
     
     return OK;
 }
-EXPORT_TO_COMMAND("版本信息", version);
+EXPORT_COMMAND("version", "版本信息", version);
 
 /*********************************************************************************************************************
 ** Function name:           time
@@ -115,7 +115,7 @@ int time(char *Option)
     printk("当前时间: %2d:%2d:%2d\r\n", Time.Hour, Time.Minute, Time.Second);
     return OK;
 }
-EXPORT_TO_COMMAND("当前时间", time);
+EXPORT_COMMAND("time", "当前时间", time);
 
 /*********************************************************************************************************************
 ** Function name:           clear
@@ -139,7 +139,7 @@ int clear(char *Option)
     
     return OK;
 }
-EXPORT_TO_COMMAND("清屏", clear);
+EXPORT_COMMAND("clear", "清屏", clear);
 
 /*********************************************************************************************************************
 ** Function name:           help
@@ -159,13 +159,13 @@ EXPORT_TO_COMMAND("清屏", clear);
 *********************************************************************************************************************/
 int help(char *Option)
 {
-    SERVICE         *pService;
-    SERVICE         *pStart;                                                /* 服务列表起始地址                     */
-    SERVICE         *pEnd;                                                  /* 服务列表结束地址                     */
+    struct command_t         *pService;
+    struct command_t         *pStart;                                       /* 服务列表起始地址                     */
+    struct command_t         *pEnd;                                         /* 服务列表结束地址                     */
 
 
-    pStart = (SERVICE*)&aConsoleServices$$Base;
-    pEnd   = (SERVICE*)&aConsoleServices$$Limit;
+    pStart = (struct command_t*)&aConsoleServices$$Base;
+    pEnd   = (struct command_t*)&aConsoleServices$$Limit;
     for(pService = pStart; pService < pEnd; pService++)
     {
         printk("%-16s:%-16s\r\n", pService->pName, pService->pDescription);
@@ -173,7 +173,7 @@ int help(char *Option)
     
     return OK;
 }
-EXPORT_TO_COMMAND("帮助", help);
+EXPORT_COMMAND("help", "帮助", help);
 
 /*********************************************************************************************************************
 ** Function name:           count_used_stack_size
@@ -236,7 +236,7 @@ int thread(char *Option)
     
     return OK;
 }
-EXPORT_TO_COMMAND("线程信息", thread);
+EXPORT_COMMAND("thread", "线程信息", thread);
 
 /*********************************************************************************************************************
 ** Function name:           kill_thread
@@ -254,21 +254,16 @@ EXPORT_TO_COMMAND("线程信息", thread);
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-static int kill_thread(char *Option)
+static int do_kill(char *Option)
 {
     printk("杀除线程:%s\r\n", Option);
     
-    return ERR_SOFTWARE;
+    return ERR_BAD_PARAM;
 }
-const SERVICE ServiceKill SECTION("aConsoleServices")=               \
-{                                                                    \
-    "kill",                                                          \
-    "清除线程",                                                      \
-    kill_thread                                                      \
-};
+EXPORT_COMMAND("kill", "杀除线程", do_kill);
 
 /*********************************************************************************************************************
-** Function name:           device
+** Function name:           do_device
 ** Descriptions:            输出设备列表
 ** Input parameters:        
 ** Output parameters:       
@@ -283,7 +278,7 @@ const SERVICE ServiceKill SECTION("aConsoleServices")=               \
 ** Modified date:           
 ** Test recorde:            
 *********************************************************************************************************************/
-static int device(char *pOption)
+static int do_device(char *pOption)
 {
     DEVICE          *pDevice;
     DEVICE          *pStart;
@@ -301,7 +296,7 @@ static int device(char *pOption)
 
     return OK;
 }
-EXPORT_TO_COMMAND("设备列表", device);
+EXPORT_COMMAND("device", "设备列表", do_device);
 
 /*********************************************************************************************************************
                                                     END OF FILE

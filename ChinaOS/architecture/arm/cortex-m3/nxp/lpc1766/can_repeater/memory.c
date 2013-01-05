@@ -31,6 +31,7 @@
 #include    <include/types.h>
 #include    <library/memory.h>
 #include    <library/printk.h>
+#include    <stdlib.h>
 
 /*********************************************************************************************************************
                                                   MACRO DEFINITIONS
@@ -41,7 +42,6 @@
 /*********************************************************************************************************************
                                                   TYPE DEFINITIONS
 *********************************************************************************************************************/
-/* section ---------------------------------------------------------------------------------------------------------*/
 
 
 /*********************************************************************************************************************
@@ -50,12 +50,11 @@
 extern void                *Image$$HeapBase1$$Base;                         /* 堆区1基址                            */
 extern void                *Image$$HeapBase2$$Base;                         /* 堆区2基址                            */
 
-const SEGMENT               aMemorySegments[] =                             /* 内存段列表                           */
+const struct bank         aRamBanks[] =                                     /* 内存段列表                           */
 {
-    {&Image$$HeapBase1$$Base, (void *)0x10008000},
-    {&Image$$HeapBase2$$Base, (void *)0x20084000},
+    {(unsigned long)&Image$$HeapBase1$$Base, 0x10008000},
+    {(unsigned long)&Image$$HeapBase2$$Base, 0x20084000},
 };
-const int                   NumOfHeap = ARRAY_SIZE(aMemorySegments);        
 
 /*********************************************************************************************************************
 ** Function name:           heap
@@ -78,16 +77,115 @@ int heap(char *Option)
     int         i;
 
 
-    for (i = 0; i < sizeof(aMemorySegments)/sizeof(SEGMENT); i++)
+    for (i = 0; i < ARRAY_SIZE(aRamBanks); i++)
     {
         printk("内存空间%d:[0x%X,0x%X) 共%dK字节\r\n", i, 
-               (INT32U)aMemorySegments[i].pStartAddr, (INT32U)aMemorySegments[i].pEndAddr, 
-               (((INT32U)aMemorySegments[i].pEndAddr - (INT32U)aMemorySegments[i].pStartAddr)>>10));
+               aRamBanks[i].StartAddr, aRamBanks[i].EndAddr, 
+               ((aRamBanks[i].EndAddr - aRamBanks[i].StartAddr)>>10));
     }
     
     return OK;
 }
-EXPORT_TO_COMMAND("内存空间", heap);
+EXPORT_COMMAND("heap", "内存空间", heap);
+
+/*********************************************************************************************************************
+** Function name:           memory
+** Descriptions:            查看内存分布情况
+** Input parameters:        
+** Output parameters:       
+** Returned value:          ==OK : success.
+**                          !=OK : failure.
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-12-18  14:46:47
+** Test recorde:            编码->走读->复查->单元测试
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+int memory(char *Option)
+{    
+    int         i;
+
+
+    for (i = 0; i < ARRAY_SIZE(aRamBanks); i++)
+    {
+        struct chunk_head       *pChunk;
+        INT32U                   End;
+        char                    *pStatus;
+        
+        for (pChunk = (struct chunk_head *)aRamBanks[i].StartAddr; USED != pChunk->ThisInfo;
+             pChunk = (struct chunk_head *)End)
+        {
+            End = (INT32U)pChunk + (pChunk->ThisInfo & ~USED);
+            pStatus = (pChunk->ThisInfo & USED) ? "used" : "free";
+            printk("内存空间: [0x%8X, 0x%8X, 0x%8X] : %s : %6d\r\n", pChunk, pChunk + 1, End - 1, pStatus, pChunk->ThisInfo & ~USED);
+        }
+    }
+    return OK;
+}
+EXPORT_COMMAND("memory", "内存空间", memory);
+
+/*********************************************************************************************************************
+** Function name:           do_malloc
+** Descriptions:            申请内存空间
+** Input parameters:        
+** Output parameters:       
+** Returned value:          ==OK : success.
+**                          !=OK : failure.
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-12-18  16:10:11
+** Test recorde:            编码->走读->复查->单元测试
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+int do_malloc(char *Option)
+{
+    void        *pMemory;
+    int         Size = atoi(Option);
+
+
+    pMemory = malloc(Size);
+    if (pMemory == NULL)
+    {
+        return ERR_NO_MEMERY;
+    }
+
+    printk("分配内存空间:0x%X\r\n", pMemory);
+    return OK;
+}
+EXPORT_COMMAND("malloc", "申请内存空间", do_malloc);
+
+/*********************************************************************************************************************
+** Function name:           do_free
+** Descriptions:            释放内存空间
+** Input parameters:        
+** Output parameters:       
+** Returned value:          ==OK : success.
+**                          !=OK : failure.
+**--------------------------------------------------------------------------------------------------------------------
+** Created by:              Feng Liang
+** Created Date:            2012-12-18  16:11:9
+** Test recorde:            编码->走读->复查->单元测试
+**--------------------------------------------------------------------------------------------------------------------
+** Modified by:             
+** Modified date:           
+** Test recorde:            
+*********************************************************************************************************************/
+int do_free(char *Option)
+{
+    void        *pMemory = (void *)atoi(Option);
+
+    
+    printk("释放内存空间:0x%X\r\n", pMemory);
+    free(pMemory);
+    return OK;
+}
+EXPORT_COMMAND("free", "释放内存空间", do_free);
 
 /*********************************************************************************************************************
                                                     END OF FILE

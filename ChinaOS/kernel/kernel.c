@@ -52,15 +52,7 @@
 /*********************************************************************************************************************
                                                    ÀàÐÍ¶¨ÒåÇø
 *********************************************************************************************************************/
-/* ¿ÕÏÐÏß³Ì¿ØÖÆ±íÀàÐÍ ----------------------------------------------------------------------------------------------*/
-struct __idle_pcl
-{
-    REGISTER           *pStackTop;                                          /* Ïß³ÌÕ»¶¥Ö¸Õë(ÒªÇó: ½á¹¹ÌåµÚÒ»ÔªËØ)   */
-    REGISTER           *pStackBottom;                                       /* Ïß³ÌÕ»µ×Ö¸Õë                         */
-    INT32U              Priority;                                           /* Ïß³ÌÓÅÏÈÈ¨                           */
-    char               *pName;                                              /* Ïß³ÌÃû³Æ                             */
-};
-typedef     struct __idle_pcl                       IDLE_PCL;               /* ¿ÕÏÐÏß³Ì¿ØÖÆ±íÀàÐÍ                   */
+
 
 /*********************************************************************************************************************
                                                   È«¾Ö±äÁ¿¶¨ÒåÇø
@@ -68,9 +60,10 @@ typedef     struct __idle_pcl                       IDLE_PCL;               /* ¿
 INT32U                  OS_ActivePrio;                                      /* ¼¤»îµÄÓÅÏÈ¼¶Î»±êÖ¾                   */
 struct list_head        OS_ActiveProc[33];                                  /* ¼¤»îµÄÏß³Ì¶ÓÁÐ                       */
 THREAD                 *OS_This;                                            /* µ±Ç°ÔËÐÐµÄÏß³Ì                       */
-THREAD                 *OS_LiveList;                                        /* ¼¤»îÏß³ÌÁ´±í                         */
 
+THREAD                 *OS_LiveList;                                        /* ¼¤»îÏß³ÌÁ´±í                         */
 struct list_head        OS_DeadList;                                        /* ½©Ê¬Ïß³ÌÁ´±í                         */
+
 static THREAD           OS_Idle;                                            /* ¿ÕÏÐÏß³Ì¿ØÖÆ±í                       */
 static REGISTER         OS_aIdleStack[THREAD_IDLE_STACK_SIZE];              /* ¿ÕÏÐÏß³ÌÕ»                           */
 
@@ -108,7 +101,7 @@ extern int main(void *option);
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-STATUS mallocor_setup(void);
+int mallocor_setup(void);
 
 /*********************************************************************************************************************
 ** Function name:           stack_init
@@ -131,7 +124,7 @@ REGISTER *stack_init(int (*pProcess)(void *), void *pOption, void *pStackBottom)
 
 
 /*********************************************************************************************************************
-** Function name:           thread_wakeup
+** Function name:           vivify_thread
 ** Descriptions:            Ïß³Ì
 ** Input parameters:        
 ** Output parameters:       
@@ -182,7 +175,8 @@ static void thread_register(THREAD *pThread)
     {
         ppNode = &((*ppNode)->pLive);
     }
-    
+
+    pThread->pLive = NULL;
     *ppNode = pThread;                                                      /* Á´½Óµ½Î²²¿                           */
 }
 
@@ -292,7 +286,7 @@ void exit(INT32S Info)
 ** Modified date:
 ** Test recorde:
 *********************************************************************************************************************/
-STATUS kill(INT32S Thread)
+int kill(INT32S Thread)
 {
     /*
      * ±¾º¯ÊýÊÇ·ñÖ»ÄÜÉ±ËÀÆäËüÏß³Ì, ²»ÄÜÉ±ËÀ±¾Ïß³Ì.
@@ -340,8 +334,6 @@ STATUS kill(INT32S Thread)
 
     return OK;
 }
-
-
 
 /*********************************************************************************************************************
 ** Function name:           signal
@@ -404,7 +396,7 @@ INT32S signal(INT32S SigNum, void *pFunction)
 ** Modified date:
 ** Test recorde:
 *********************************************************************************************************************/
-REGISTER * shift_thread(REGISTER *pStackTop)
+REGISTER * shift(REGISTER *pStackTop)
 {
     INT32S          Priority;
 
@@ -634,7 +626,8 @@ static int idle(void *option)
     device_setup();
     
     labour("main", main, NULL, 2040, THREAD_MAIN_PRIORITY);
-
+    labour("console", command, NULL, 2040, 31);
+    
     while (1)
     {
         struct list_head        *pNode;
@@ -648,11 +641,6 @@ static int idle(void *option)
             list_del(&pThread->Node);
             free(pThread);
         }
-        
-        /*
-         * 5) Ìá¹©¿ØÖÆÌ¨·þÎñ
-         */
-        command();
     }
 }
 

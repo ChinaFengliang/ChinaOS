@@ -82,7 +82,7 @@ int console_setup(void);
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-extern void command(void);
+extern int command(void *);
 
 
 

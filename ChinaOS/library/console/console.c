@@ -98,10 +98,10 @@ static void service(char *pCmdName)
      */
 
     
-    int             CmdSize;                                                /* 命令长度                             */
-    int             Status;                                                 /* 服务状态                             */
-    int           (*pService)(char *Option) = NULL;                         /* 服务函数                             */
-    SERVICE        *pItem;
+    int                   CmdSize;                                                /* 命令长度                             */
+    int                   Status;                                                 /* 服务状态                             */
+    int           		(*pService)(char *Option) = NULL;                         /* 服务函数                             */
+    struct command_t     *pItem;
 
     /*
      *  计算命令字符数量保存至CmdSize中.
@@ -119,8 +119,8 @@ static void service(char *pCmdName)
     /*
      * 获取服务入口函数保存至pService
      */
-    for (pItem = (SERVICE*)&aConsoleServices$$Base; 
-         pItem < (SERVICE*)&aConsoleServices$$Limit; pItem++)
+    for (pItem = (struct command_t*)&aConsoleServices$$Base; 
+         pItem < (struct command_t*)&aConsoleServices$$Limit; pItem++)
     {
         if (CmdSize != strlen(pItem->pName))
         {
@@ -139,12 +139,14 @@ static void service(char *pCmdName)
     if (NULL != pService)
     {
         Status = (*pService)(pCmdName + CmdSize + 1);                       /* 执行服务函数                         */
-        printk("%s命令执行状态: %d, %s\r\n\n",
-               pCmdName, Status, aStatus[-Status]);
+        if (OK != Status)
+        {
+            printk("%s命令执行状态: %d, %s\r\n\n", pCmdName, Status, aStatus[-Status]);
+        }
     }
     else
     {
-        prints("This command is not supported!\r\n");
+        printk("'%s' command is not defined!\r\n", pCmdName);
     }
 }
 
@@ -164,7 +166,7 @@ static void service(char *pCmdName)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-void command(void)
+int command(void *pOption)
 {
     /* 支持消除前端空格字符;
      * 支持空命令;
@@ -176,7 +178,8 @@ void command(void)
     INT32U          CharCounter;                                            /* 有效字符计数器                       */
     char            Char;                                                   /* 字符                                 */
 
-
+while (1)
+{
     CharCounter = 0;
     aCmdBuffer[CMD_LINE_SIZE-1] = '\0';
     do
@@ -255,6 +258,7 @@ void command(void)
     service(aCmdBuffer);
 end:
     prints(aCmdPrompt);                                                     /* 输出提示符                           */
+}    
 }
 
 /*********************************************************************************************************************

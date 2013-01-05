@@ -49,7 +49,7 @@
 #define  ERR                       -1                                       /* 操作失败(通用)                       */
 #define  ERR_HARDWARE              -2                                       /* 硬件出错                             */
 #define  ERR_SOFTWARE              -3                                       /* 软件出错                             */
-#define  ERR_BAD_PARAM             -4                                       /* 参数出错                             */
+#define  ERR_BAD_PARAM             -4                                       /* 非法参数                             */
 #define  ERR_TIMEOUT               -5                                       /* 超时出错                             */
 #define  ERR_DEVICE_BUSY           -6                                       /* 设备忙                               */
 #define  ERR_NO_MEMERY             -7                                       /* 内存不足                             */
@@ -194,8 +194,8 @@ static INLINE unsigned char toupper(unsigned char c)
 #define SECTION(Name)               __attribute__((section(Name)))
 //#define SECTION(Name)               __attribute__(used, (section(Name)))
 /*********************************************************************************************************************
-** Function name:           EXPORT_TO_COMMAND
-** Descriptions:            导出函数到命令列表
+** Function name:           EXPORT_COMMAND
+** Descriptions:            导出命令
 ** Input parameters:        Description: 功能描述
 **                          Function   : 功能函数
 ** Output parameters:       
@@ -209,10 +209,10 @@ static INLINE unsigned char toupper(unsigned char c)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-#define EXPORT_TO_COMMAND(Description, Function)                           \
-        const SERVICE Service##Function SECTION("aConsoleServices")=       \
+#define EXPORT_COMMAND(Name, Description, Function)                        \
+        const struct command_t Cmd##Function SECTION("aConsoleServices")=  \
         {                                                                  \
-            #Function,                                                     \
+            Name,                                                          \
             Description,                                                   \
             Function                                                       \
         }
@@ -233,7 +233,7 @@ static INLINE unsigned char toupper(unsigned char c)
 ** Modified date:
 ** Test recorde: 
 *********************************************************************************************************************/
-#define EXPORT_TO_DEVICE(Device, Description)                              \
+#define EXPORT_DEVICE(Device, Description)                              \
         const DEVICE List##Device SECTION("aDeviceList")=                  \
         {                                                                  \
             #Device,                                                       \

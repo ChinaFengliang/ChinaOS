@@ -144,7 +144,7 @@ struct timer_t mtimer =
     mtimer_cleanup,
     mtimer_gettick,
 };
-EXPORT_TO_DEVICE(mtimer, "毫秒定时器");
+EXPORT_DEVICE(mtimer, "毫秒定时器");
 
 /*********************************************************************************************************************
                                                     END OF FILE

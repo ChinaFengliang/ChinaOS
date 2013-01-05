@@ -111,7 +111,7 @@ int restart(char *pOption)
     write_dword(AIRCR, Register); 
     return OK;
 }
-EXPORT_TO_COMMAND("复位系统", restart);
+EXPORT_COMMAND("restart", "复位系统", restart);
 
 
 /*********************************************************************************************************************
